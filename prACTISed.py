@@ -1,5 +1,5 @@
 # ACTIS - Kd Determination Program
-# August 3, 2021
+# August 5, 2021
 
 # This program extracts ACTIS titration data in a Microsoft Excel file (.xlsx) organized in a particular way*,
 # and determines the signal (average peak height within a detection window) for each concentration and a corresponding
@@ -36,11 +36,12 @@ from scipy.optimize import curve_fit
 workbook = Workbook()          # Establishing the initial workbook which will be used
 worksheet = workbook.active
 
-fileName = (input("Which file? "))          # Gathering input from the user on the file name containing titration data
+fileName = (input("File Path: "))          # Gathering input from the user on the file name containing titration data
 #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName)          # Locating the file on the computer - NOTE: This must be changed for different devices
 data = pd.read_excel(fileName)
 
-
+idealBook =  load_workbook(fileName, data_only=True)          # Locating the peak position from the cell in the temporary Excel file
+idealSheet = idealBook["Inputs"]
 
 
 from pathlib import PurePath
@@ -54,9 +55,14 @@ name = location.name
 
 
 ## Part 3 - Establishing important inputs
-percentage = input("What +/- decimal range (e.g. 0.04)? ")          # Gathering input from the user on what detection window would like to be used
+percentage = (idealSheet.cell(1,2).value)/100
+#print(percentage)
 
-numberOfConcs = int(input("How many concentrations? "))          # Gathering input from the user on how many initial protein concentrations will be used
+#percentage = input("What +/- decimal range (e.g. 0.04)? ")          # Gathering input from the user on what detection window would like to be used
+
+numberOfConcs = str(idealSheet.cell(3,2).value)
+#print(numberOfConcs)
+#numberOfConcs = int(input("How many concentrations? "))          # Gathering input from the user on how many initial protein concentrations will be used
 print("")
 
 
@@ -72,12 +78,16 @@ def stdev(data):          # Defining a function and performing the function to c
 noise = []
 
 
-for x in range(1,numberOfConcs + 1):          # For each concentration, the user is asked what the initial protein concentration (i.e. [P]0) is
-    conc1 = input("What is concentration #" + str(x) + " (in µM)? ")
-    protConc1 = input("What is protein concentration #" + str(x) + " (in µM)? ")
+for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the user is asked what the initial protein concentration (i.e. [P]0) is
+    conc1 = idealSheet.cell(x,5).value
+    #print(conc1)
+    #conc1 = input("What is concentration #" + str(x) + " (in µM)? ")
+    protConc1 = conc1
+    #protConc1 = input("What is protein concentration #" + str(x) + " (in µM)? ")
 
     runNumber =1 
-    numberOfRuns = int(input("How many runs? "))          # Gathering input for how many runs of each particular protein concentration are performed
+    numberOfRuns = idealSheet.cell(x,7).value
+    #numberOfRuns = int(input("How many runs? "))          # Gathering input for how many runs of each particular protein concentration are performed
 
     
 ## Part 3 - Data collection
@@ -100,7 +110,7 @@ for x in range(1,numberOfConcs + 1):          # For each concentration, the user
 
         
         #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName, conc1 + " µM")
-        data = pd.read_excel(fileName, conc1 + " µM")
+        data = pd.read_excel(fileName, str(conc1) + " µM")
         
         xValues = pd.DataFrame(data,columns = ['raw time'])          # Used to plot the separagram for each run as well as the bounds for the detection window selected
         xValues = (xValues)
@@ -137,11 +147,12 @@ for x in range(1,numberOfConcs + 1):          # For each concentration, the user
         
         
         
-        
-        injectionTime = int(input("How long is injection time (in seconds, enter an integer)? "))
+        injectionTime = idealSheet.cell(5,2).value
+        #print(injectionTime)
+        #injectionTime = int(input("How long is injection time (in seconds, enter an integer)? "))
         
         excelBook =  load_workbook(fileName, data_only=True)          # Locating the peak position from the cell in the temporary Excel file
-        wsheet = excelBook[conc1 + " µM"]
+        wsheet = excelBook[str(conc1) + " µM"]
         
         
         
@@ -214,39 +225,40 @@ for x in range(1,numberOfConcs + 1):          # For each concentration, the user
         
         
         
-        
-        #sheet[columnA + "2"] = "1"
-        sheet[columnA + "2"] = "=INDEX('[" + name + "]" + conc1 + " µM" + "'!$A2:$A" + (excelRows) + ",MATCH(MAX('[" + name + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + "), '[" + name + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + ",0))"          # This function is put into the temporary Excel file in order to determine the average peak height within the detection window
-        #sheet[columnA + "2"] = "=INDEX('[" + fileName + "]" + conc1 + " µM" + "'!$A2:$A" + (excelRows) + ",MATCH(MAX('[" + fileName + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + "), '[" + fileName + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + ",0))"          # This function is put into the temporary Excel file in order to determine the average peak height within the detection window
-        wb.save("TempFile6.xlsx")
-
-        def pause():        # A function in python is defined that pauses the program until the user enters "space" (i.e., presses Spacebar on a keyboard); this key can be altered to anything desired
-            while True:
-                if keyboard.read_key() == 'space':
-                    break
-
-        print("")
-        print("The program is currently paused.")        # This section of code informs the user that they must open up the temporary file, save it, close it and press space back on Python to allow the program to proceed
-        print("Please open up \"TempFile6.xlsx\", save it and close it.")
-        print("Once this is done, press Space to resume the program")
-        print("")
-        pause()
-
-        book =  load_workbook("TempFile6.xlsx", data_only=True)          # Locating the peak position from the cell in the temporary Excel file
-        sheet = book.active
-        
-        
-        maxTime = sheet.cell(2,1).value
-        #print(peakPosition)
-        
-        
         if x == 1 and runNumber == 1:
+            #sheet[columnA + "2"] = "1"
+            sheet[columnA + "2"] = "=INDEX('[" + name + "]" + str(conc1) + " µM" + "'!$A2:$A" + (excelRows) + ",MATCH(MAX('[" + name + "]" + str(conc1) + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + str(excelRows) + "), '[" + name + "]" + str(conc1) + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + str(excelRows) + ",0))"          # This function is put into the temporary Excel file in order to determine the average peak height within the detection window
+            #sheet[columnA + "2"] = "=INDEX('[" + fileName + "]" + conc1 + " µM" + "'!$A2:$A" + (excelRows) + ",MATCH(MAX('[" + fileName + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + "), '[" + fileName + "]" + conc1 + " µM" + "'!" + str(runColumn) + "2:" + str(runColumn) + (excelRows) + ",0))"          # This function is put into the temporary Excel file in order to determine the average peak height within the detection window
+            wb.save("TempFile6.xlsx")
+
+            def pause():        # A function in python is defined that pauses the program until the user enters "space" (i.e., presses Spacebar on a keyboard); this key can be altered to anything desired
+                while True:
+                    if keyboard.read_key() == 'space':
+                        break
+
+            print("")
+            print("The program is currently paused.")        # This section of code informs the user that they must open up the temporary file, save it, close it and press space back on Python to allow the program to proceed
+            print("Please open up \"TempFile6.xlsx\", save it and close it.")
+            print("Once this is done, press Space to resume the program")
+            print("")
+            pause()
+
+            book =  load_workbook("TempFile6.xlsx", data_only=True)          # Locating the peak position from the cell in the temporary Excel file
+            sheet = book.active
+        
+        
+            maxTime = sheet.cell(2,1).value
+            #print(peakPosition)
+        
+        
+        
             recommendedTimeDiff = maxTime - onsetTime
             
         recommendedTime = onsetTime + recommendedTimeDiff
                 
         
-        peakPosition = float(input("What time for peak? (Recommended: " + str(recommendedTime) + " seconds) "))
+        #peakPosition = float(input("What time for peak? (Recommended: " + str(recommendedTime) + " seconds) "))
+        peakPosition = recommendedTime
         ####################################################
     
         peakPositionPlusX = peakPosition + (float(percentage) * peakPosition)          # Determining the bounds of the detection window
@@ -254,12 +266,12 @@ for x in range(1,numberOfConcs + 1):          # For each concentration, the user
 
 #############################################################################################
 
-        data = pd.read_excel(fileName, conc1 + " µM")
+        data = pd.read_excel(fileName, str(conc1) + " µM")
         #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName, conc1 + " µM")          # Locating the signal values from the titration data Excel file, NOTE: This file path must be changed for different devices
 
         wb = load_workbook(fileName)          # Selecting and activating the particular workbook/worksheet chosen for the code to run
         #sheet = wb.active
-        sheet = wb[conc1 + " µM"]
+        sheet = wb[str(conc1) + " µM"]
         
 
         periods = int(excelRows)          # This indicates the number of rows in the titration data Excel file containing signal data; NOTE: This number may be changed for different data sets
@@ -366,13 +378,16 @@ for x in range(1,numberOfConcs + 1):          # For each concentration, the user
     #workbook =  load_workbook("ASDF.xlsx")
     
 ## Part 4 - Preparing the Excel File with R values
-    worksheet["A" + str(x+1)] = conc1 + " µM"          # Organizing the data contained within the Excel file (temporary "ASDF.xlsx" file)
+    worksheet["A" + str(x+1)] = str(conc1) + " µM"          # Organizing the data contained within the Excel file (temporary "ASDF.xlsx" file)
     worksheet["H" + str(x+1)] = float(protConc1)
     worksheet["C" + str(x+1)] = float(totalAverage/numberOfRuns)
-#    worksheet["E" + str(x+1)] = standardDeviation
-#    worksheet["F" + str(x+1)] = relativeStdDev
-    worksheet["I" + str(x+1)] = "=(C" + str(x+1) + "-$C$" + str(numberOfConcs+1) + ")/($C$2" + "-$C$" + str(numberOfConcs+1) + ")"
-    worksheet["J" + str(x+1)] = "=1/($C$2 - $C$" + str(numberOfConcs+1) + ")*SQRT(E" + str(x+1) + "^2+((C" + str(x+1) + "-$C$2)/($C$2-$C$" + str(numberOfConcs+1) + ")*$E$" + str(numberOfConcs+1) + ")^2+(($C$" + str(numberOfConcs+1) + "-C" + str(x+1) + ")/($C$2-$C$" + str(numberOfConcs+1) + ")*$E$2)^2)"
+    worksheet["E" + str(x+1)] = standardDeviation
+    worksheet["F" + str(x+1)] = relativeStdDev
+    
+#    print(str(int(numberOfConcs)+1))
+    
+    worksheet["I" + str(x+1)] = "=(C" + (str(x+1)) + "-$C$" + (str(int(numberOfConcs)+1)) + ")/($C$2" + "-$C$" + (str(int(numberOfConcs)+1)) + ")"
+    worksheet["J" + str(x+1)] = "=1/($C$2 - $C$" + str(int(numberOfConcs)+1) + ")*SQRT(E" + str(x+1) + "^2+((C" + str(x+1) + "-$C$2)/($C$2-$C$" + str(int(numberOfConcs)+1) + ")*$E$" + str(int(numberOfConcs)+1) + ")^2+(($C$" + str(int(numberOfConcs)+1) + "-C" + str(x+1) + ")/($C$2-$C$" + str(int(numberOfConcs)+1) + ")*$E$2)^2)"
     #workbook.save("ASDF.xlsx")
     
 #workbook =  load_workbook("ASDF.xlsx")        
@@ -412,7 +427,7 @@ yError = []
 excelFile = load_workbook("ASDF.xlsx", data_only=True)          # Opening up the temporary file containing the concentration and R values
 activeBook = excelFile.active
 
-for a in range(2,(numberOfConcs+2)):          # Storing the R values and concentration values in the temporary classes created above
+for a in range(2,(int(numberOfConcs)+2)):          # Storing the R values and concentration values in the temporary classes created above
     xValues = activeBook.cell(a,8).value
     #print(xValues)
     yValues = activeBook.cell(a,9).value
@@ -439,7 +454,9 @@ plt.scatter(xData,yData, color = 'black', label='Experiment')          # Plottin
 plt.errorbar(xData, yData, linestyle = 'None', yerr = yError, ecolor = 'black', elinewidth=1, capsize=2, capthick=1)
 plt.xscale("log")          # Creating a logarithmic x-axis scale
 
-ligandConc = float(input("What is the initial ligand concentration (in µM)? "))          # Inputting the initial ligand concentration (i.e. [L]0) for the non-linear curve fitting, Kd equation
+ligandConc = idealSheet.cell(7,2).value
+#print(ligandConc)
+#ligandConc = float(input("What is the initial ligand concentration (in µM)? "))          # Inputting the initial ligand concentration (i.e. [L]0) for the non-linear curve fitting, Kd equation
 popt, pcov = curve_fit(func, xData, yData)          # Performing curve fitting
 
 ##########################
