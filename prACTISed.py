@@ -1,5 +1,5 @@
 # ACTIS - Kd Determination Program
-# August 5, 2021
+# August 6, 2021
 
 # This program extracts ACTIS titration data in a Microsoft Excel file (.xlsx) organized in a particular way*,
 # and determines the signal (average peak height within a detection window) for each concentration and a corresponding
@@ -99,6 +99,7 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
     
 
 
+    peakOnsetTimes = []
 
     for runNumber in range(1, numberOfRuns+1):
     
@@ -173,6 +174,8 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
         timeSpecificTotal = 0
         backgroundSigs = []
         
+        
+        
         for variable1 in range(2, int(excelRows)+1):
             timeColumn = "A" + str(variable1)
             timeSpecific = wsheet[timeColumn].value
@@ -217,10 +220,12 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
                 #print("boundary " + str(boundary))
                 
                 onsetTime = wsheet.cell(rowNumber1,1).value
-                print("Peak onset time: " + str(onsetTime))
+                
+                #print("Peak onset time: " + str(onsetTime))        # ADJUSTABLE as of Aug 6; can remove "#" to show peak onset time for each run
         
                 break
             
+        peakOnsetTimes.append(onsetTime)
    
         
         
@@ -365,6 +370,7 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
     #print("and the relative standard deviation is " + str(relativeStdDev) + "%")          # Outputting the relative standard deviation for all of the runs for each concentration
     print("Standard deviation: " + str((relativeStdDev/100)*averageOfRange))
     print("Relative standard deviation: " + str(relativeStdDev) + "%")
+    print("Peak onset times: " + str(peakOnsetTimes) + " seconds")
     print("")
     
     
