@@ -30,7 +30,6 @@ from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl.utils import FORMULAE
 from openpyxl.utils import get_column_letter, column_index_from_string
-import keyboard
 import math
 from scipy.optimize import curve_fit
 
@@ -110,7 +109,7 @@ for x in range(1,int(numberOfConcs) + 1):
         plt.title('Graph')
         plt.xlim(xmin=0)
         #plt.ylim(ymax=11)
-        plt.show()    
+        #plt.show()    
         
         #########################################
         excelRows = str(1154) # ADJUSTABLE
@@ -216,7 +215,7 @@ for x in range(1,int(numberOfConcs) + 1):
         plt.vlines(peakPositionMinusXSec, 0, maxValForGraph, linestyles='dashed',color='black')
         plt.vlines(peakPositionPlusXSec, 0, maxValForGraph, linestyles='dashed',color='black')     
    
-        plt.show()
+        #plt.show()
 
 #############################################################################################
         averageOfRange = peakHeightTotal/count          # Determining the average peak height within the detection window for all of the runs for each concentration and outputting it
