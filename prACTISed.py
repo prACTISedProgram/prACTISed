@@ -64,13 +64,13 @@ data = pd.read_excel(fileName, engine='openpyxl')
 idealBook =  load_workbook(fileName, data_only=True)          # Locating the peak position from the cell in the temporary Excel file
 idealSheet = idealBook["Inputs"]
 
-location = pathlib.PurePath(fileName) 
-name = location.name
+name = pathlib.PurePath(fileName).name
 
 
 ## Part 3 - Establishing important inputs
 percentage = (idealSheet.cell(1,2).value)/100
 numberOfConcs = str(idealSheet.cell(3,2).value)
+injectionTime = idealSheet.cell(5,2).value
 
 def stdev(data):          # Defining a function and performing the function to calculate the standard deviation of the data
         n=len(data)
@@ -98,7 +98,31 @@ for x in range(1,int(numberOfConcs) + 1):
 
     peakOnsetTimes = []
 
+    # Reading in the whole data frame (= all runs for one particular concentration)
+    # and dropping all lines that are blank, i.e. that would produce "NaN"s
+    data = pd.read_excel(fileName, str(conc1) + " µM", engine='openpyxl')
+    data = data.dropna(how='all')
+
     for runNumber in range(1, numberOfRuns+1):
+        print("")
+        print("-------- " + str(conc1) + " µM" + " ---- Experimental Run " + str(runNumber) + " --------")
+
+        xvalues = data['raw time']
+        yvalues = data['Experiment ' + str(runNumber)]
+
+        # All y-values before the injection time are considered background signal 
+        background_yvalues = yvalues[xvalues < injectionTime]
+        background_average = np.average(background_yvalues)
+        background_stdev = np.std(background_yvalues)
+
+        if args['verbose']:
+            print("Background signal (first %d values): %.4f±%.4f" % (len(background_yvalues), 
+                                                                      background_average,
+                                                                      background_stdev))
+
+        exit(0)
+        # TODO: Modify rest of the code to get rid of the temporary worksheets, adding verbose statements, etc.
+
     
         wb = Workbook()          # Selecting and activating the particular workbook/worksheet chosen for the code to run
         sheet = wb.active
@@ -106,10 +130,10 @@ for x in range(1,int(numberOfConcs) + 1):
         runColumn = get_column_letter(int(runNumber) + 1)          # Locating column A of the spreadsheet to obtain time data
         columnA = get_column_letter(1)
 
-        data = pd.read_excel(fileName, str(conc1) + " µM", engine='openpyxl')
+        
         
         xValues = pd.DataFrame(data,columns = ['raw time'])          # Used to plot the separagram for each run as well as the bounds for the detection window selected
-        xValues = (xValues)
+        xValues = (xValues)      
         yValues = pd.DataFrame(data,columns = ['Experiment ' + str(runNumber)])
         
         maxVal = float(yValues.max())
