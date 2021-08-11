@@ -23,6 +23,8 @@
 
 
 ## Part 1 - Importing the required libraries and sub-libraries required below
+import argparse
+import pathlib
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,11 +36,26 @@ import math
 from scipy.optimize import curve_fit
 
 
+## Part X - Argument setup and parsing
+parser = argparse.ArgumentParser(
+			description = 'prACTISed! This program analyzes ACTIS data and extracts the Kd-value.')
+
+parser.add_argument('inputfile', action = 'store', nargs = 1, type = str)
+parser.add_argument('--version', help = 'prints version information', action = 'version', 
+            version = 'prACTISed written by Shiv Jain.')
+parser.add_argument('-v', '--verbose', help = 'prints detailed output while analyzing', action = 'store_true')
+
+args = vars(parser.parse_args())
+
+
 ## Part 2 - Locating the raw data file
 workbook = Workbook()          # Establishing the initial workbook which will be used
 worksheet = workbook.active
 
-fileName = (input("File Path: "))          # Gathering input from the user on the file name containing titration data
+fileName = args['inputfile'][0] # It's a list but we only can work with one file
+if not pathlib.Path(fileName).is_file():
+    print("Given file '%s' is not a file or does not exist." % fileName)
+    exit(-1)
 
 # Set explicitly the engine to use openpyxl - otherwise it might use xlrd, which has removed
 # support for Excel's xlsx format (only supports the old binary format)
@@ -47,8 +64,7 @@ data = pd.read_excel(fileName, engine='openpyxl')
 idealBook =  load_workbook(fileName, data_only=True)          # Locating the peak position from the cell in the temporary Excel file
 idealSheet = idealBook["Inputs"]
 
-from pathlib import PurePath
-location = PurePath(fileName) 
+location = pathlib.PurePath(fileName) 
 name = location.name
 
 
