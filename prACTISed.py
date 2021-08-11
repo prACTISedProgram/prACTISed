@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # ACTIS - Kd Determination Program
 # August 6, 2021
 
