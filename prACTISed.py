@@ -41,7 +41,7 @@ worksheet = workbook.active
 
 fileName = (input("File Path: "))          # Gathering input from the user on the file name containing titration data
 #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName)          # Locating the file on the computer - NOTE: This must be changed for different devices
-data = pd.read_excel(fileName)
+data = pd.read_excel(fileName, engine='openpyxl')
 
 idealBook =  load_workbook(fileName, data_only=True)          # Locating the peak position from the cell in the temporary Excel file
 idealSheet = idealBook["Inputs"]
@@ -114,7 +114,7 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
 
         
         #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName, conc1 + " µM")
-        data = pd.read_excel(fileName, str(conc1) + " µM")
+        data = pd.read_excel(fileName, str(conc1) + " µM", engine='openpyxl')
         
         xValues = pd.DataFrame(data,columns = ['raw time'])          # Used to plot the separagram for each run as well as the bounds for the detection window selected
         xValues = (xValues)
@@ -274,7 +274,7 @@ for x in range(1,int(numberOfConcs) + 1):          # For each concentration, the
 
 #############################################################################################
 
-        data = pd.read_excel(fileName, str(conc1) + " µM")
+        data = pd.read_excel(fileName, str(conc1) + " µM", engine='openpyxl')
         #data = pd.read_excel(r'C:\Users\Rajin\Desktop' + "\\" + fileName, conc1 + " µM")          # Locating the signal values from the titration data Excel file, NOTE: This file path must be changed for different devices
 
         wb = load_workbook(fileName)          # Selecting and activating the particular workbook/worksheet chosen for the code to run
