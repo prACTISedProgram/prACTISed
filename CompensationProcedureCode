@@ -1,0 +1,113 @@
+# Feb 20, 2022
+
+import argparse
+import pathlib
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from openpyxl import load_workbook
+from openpyxl import Workbook
+from openpyxl.utils import FORMULAE
+from openpyxl.utils import get_column_letter, column_index_from_string
+import keyboard
+import math
+
+Factor_List = []
+
+fileName = (input("Which file? "))
+conc1 = 0.1 # LOWEST CONCENTRATION (i.e., [P]0 << Kd)
+
+
+workbook = load_workbook(filename = fileName, data_only=True)          # The original raw data worksheet is re-opened after the active workbook became the temporary file
+sheet = workbook[str(conc1) + " µM"]
+
+excelColumns = str(5) # ADJUSTABLE
+excelRows = str(1115) # ADJUSTABLE
+
+areaAvg = 0
+
+
+areaTotal = 0
+
+for genericVariable1 in range(2,int(excelColumns)+1):
+    #print(genericVariable1)
+    for genericVariable in range(1, int(excelRows)-1):
+        temporary2 = "B" + str(genericVariable + 1)
+        temporary3 = "B" + str(genericVariable + 2)
+        temporaryA2 = "A" + str(genericVariable + 1)
+        temporaryA3 = "A" + str(genericVariable + 2)
+
+        areaSum = ((sheet[temporary2].value + sheet[temporary3].value)/2)*(sheet[temporaryA3].value - sheet[temporaryA2].value)
+        #print(areaSum)
+        areaTotal = areaTotal + areaSum
+        #print(areaTotal)
+    
+    #print(areaTotal)
+    
+    areaAvg = areaAvg + areaTotal
+    #print(areaAvg)
+    
+
+#print(areaAvg)
+#print(genericVariable1-1)
+areaAvg = areaAvg/(genericVariable1-1)
+FactorNumerator = areaAvg
+
+#print("Numerator part: " + str(OhatNNumerator))
+
+# SO FAR, THIS IS THE NUMERATOR OF ON EQUATION
+
+
+
+
+for x in range(1,int(numberOfConcs) + 1):          
+    conc1 = idealSheet.cell(x,5).value    
+    protConc1 = conc1    
+    runNumber =1 
+    numberOfRuns = idealSheet.cell(x,7).value    
+    
+    excelColumns = numberOfRuns # ADJUSTABLE
+    excelRows = str(1115) # ADJUSTABLE
+    
+    
+    workbook = load_workbook(filename = fileName, data_only=True)          # The original raw data worksheet is re-opened after the active workbook became the temporary file
+    sheet = workbook[str(conc1) + " µM"]
+
+    areaAvg1 = 0
+
+    areaTotal1 = 0
+
+    for genericVariable3 in range(2,int(excelColumns)+2):
+        #print(genericVariable3)
+        for genericVariable2 in range(1, int(excelRows)-1):
+            temporary2 = "B" + str(genericVariable2 + 1)
+            temporary3 = "B" + str(genericVariable2 + 2)
+            temporaryA2 = "A" + str(genericVariable2 + 1)
+            temporaryA3 = "A" + str(genericVariable2 + 2)
+
+            areaSum1 = ((sheet[temporary2].value + sheet[temporary3].value)/2)*(sheet[temporaryA3].value - sheet[temporaryA2].value)
+            #print(areaSum)
+            areaTotal1 = areaTotal1 + areaSum1
+            #print(areaTotal)
+            
+            
+        #print(areaTotal)
+    
+        areaAvg1 = areaAvg1 + areaTotal1
+        #print(areaAvg)
+    
+
+    #print("conc1: " + str(areaAvg1) + " genericVariable3: " + str(genericVariable3-1))
+    areaAvg1 = areaAvg1/(genericVariable3-1)
+    FactorDenominator = areaAvg1
+
+    #print("conc1: " + str(conc1) + " and areaAvg1: " + str(areaAvg1))
+    
+    Factor = FactorNumerator/FactorDenominator
+    
+    Factor_List.append(Factor)
+    
+    #print("OhatNNumerator: " + str(OhatNNumerator) + " OhatNDenominator: " + str(OhatNDenominator))
+    print("conc1: " + str(conc1) + "                O hat N: " + str(Factor))
+
+print(Factor_List)
