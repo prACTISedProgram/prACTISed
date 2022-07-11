@@ -4,32 +4,30 @@
 # ACTIS - Kd Determination Program
 # July 8, 2022
 
-#20220708 JL    NOTE: Prgram no longer generates temporary Excel files, description needs revision 
+#20220708 JL    NOTE: Program no longer generates temporary Excel files
+#20220711 JL    NOTE: Verbose statements added, all graphs returned at end of script
 
 # This program extracts ACTIS titration data in a Microsoft Excel file (.xlsx) organized in a particular way*,
 # and determines the signal (average peak height within a detection window) for each concentration and a corresponding
 # R value for each concentration, then plots a binding isotherm for R vs Protein Concentration and performs
 # non-linear curve fitting to calculate and output the Kd value for the experiment
 
-# *The program code as shown by default below requires the Microsoft Excel workbook to be organized in the following format:
+# The program code as shown by default below requires the Microsoft Excel workbook to be organized in the following format:
 # - Data for each concentration must be contained in separate worksheets within the Excel file, with each sheet being named in the following format: "# µM".
-# - The time intervals are written in column A.
+# - The time intervals are written in column A
 # - Row 2 of each worksheet must be the first row containing data
 # - Cell A1 is denoted as "raw time"
 # - Cells A# are denoted as "Experiment #"
-# - The signal measurement for each run is written in each corresponding column of the worksheet.
-# - Important note: temporary Excel files called "TempFile6.xlsx" and "ASDF.xlsx" will be generated as part of the execution of this program
-# should your device contain a file with important data in a file with this name, please note that the contents of this file will be
-# overwritten. Therefore, either rename this pre-existing file and/or adjust the name of the temporary file created in the code
-# below.
+# - The signal measurement for each run is written in each corresponding column of the worksheet
 
-# Testing script execution time         ~ 6 seconds without Verbose
+# Testing script execution time
 import time
 start = time.time()
 
 ## Part 1 - Importing the required libraries and sub-libraries required below
 import argparse                                   
 import pathlib
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -71,9 +69,8 @@ if "Inputs" in inputBook.sheetnames:
     injectionTime = int(idealSheet.cell(5,2).value)
     ligandConc = float(idealSheet.cell(7,2).value)
 
-else:
-        print("Inputfile Formatting Error: The script expects inputdata.xlsx to be in a certain format, see next section for generation or the provided idealinputs.xlsx as an example.")
-        exit
+elif "Inputs" not in inputBook.sheetnames:  
+        sys.exit("Inputfile Formatting Error: The script expects inputdata.xlsx to be in a certain format, see provided idealinputs.xlsx as an example.") 
 
 # Temporary variables
 concentration = []
@@ -82,8 +79,9 @@ stddev = []
 relstddev = []
 Rvalue = []
 Rstddev = []
+graphs = []
 forDF = [concentration,signal,stddev,relstddev,Rvalue,Rstddev]
-DFnames = ["concentration","signal","stddev","relstddev","Rvalue","Rstddev"]
+DFnames = ["Conc (µM)","Avg Signal","Std Dev","Rel Std Dev","R value","R Std Dev"]
 
 
 ## Part 3 - Calculating signal information for each concentration
@@ -101,8 +99,11 @@ for x in range(1,int(numberOfConcs)+1):
 
     # Calculate background signals for each run
     for runNumber in range(1, numberOfRuns+1):  
-        ###### FOR VERBOSE
-            #print("-------- " + str(conc1) + " µM" + " ---- Experimental Run " + str(runNumber) + " --------")
+
+        if args['verbose']:
+            # Prints the concentration and run number
+            print("-------- Concentration %.1f µM -------- Experimental Run %d  -------- " % (conc1, runNumber))
+            exit
 
         xvalues = data['raw time']
         yvalues = data['Experiment ' + str(runNumber)]
@@ -114,8 +115,9 @@ for x in range(1,int(numberOfConcs)+1):
 
 
         if args['verbose']:
-            print("Background signal (first %d values): %.4f±%.4f" % (len(background_yvalues), background_average, background_stdev))
-            exit(0)
+            # Prints the number of background signals with average and standard deviation
+            print("Background signal (first %d values): %.4f±%.4f RFU" % (len(background_yvalues), background_average, background_stdev))
+            exit
 
 
         # First run at lowest concentration used to calculate peak time and time window
@@ -123,8 +125,11 @@ for x in range(1,int(numberOfConcs)+1):
                 peakSignal = max(yvalues[xvalues>=injectionTime])
                 peakIndex = yvalues[yvalues == peakSignal].index
                 peakTime = xvalues[peakIndex]
-                ###### FOR VERBOSE
-                        #print ("The peak time is " + str(peakTime) + "seconds.")
+
+                if args['verbose']:
+                        # Prints the peak signal value and the corresponding time
+                        print("Peak signal: %.4f RFU at %.4f seconds" % (peakSignal, peakTime))
+                        exit
 
 
         # Set time window parameters and determine the average signal within window for each run             
@@ -134,34 +139,45 @@ for x in range(1,int(numberOfConcs)+1):
         windowTimes = xvalues[windowIndex]
         windowSignals = yvalues[windowIndex]
         avgSigsRun.append(np.average(windowSignals))
-        ###### FOR VERBOSE
-                #print("The time window for Experimental Run " str(runNumber) "is " + str(windowLow) + "seconds to " + str(windowHigh) + "seconds.")
         
+        if args['verbose']:
+                        # Prints the time window and average signal 
+                        print("Time window: %.4f - %.4f seconds. Average signal: %.4f RFU" % (windowLow, windowHigh,np.average(windowSignals)))
+                        exit
+
 
         # Graph the signal for each run and show time window
         #plt.scatter(xvalues, yvalues)
         #plt.xlabel('Propagation time (s)')
         #plt.ylabel('Fluorescence signal (RFU)')
-        #plt.title('Graph')
+        #plt.title("Separagram for %.1f µM Experimental Run %d" % (conc1, runNumber))
         #plt.xlim(xmin=0)
         #plt.vlines(windowLow, 0, (float(yvalues.max()+ 0.05*float(yvalues.max()))), linestyles='dashed',color='black')
-        #plt.vlines(windowHigh, 0, (float(yvalues.max()+ 0.05*float(yvalues.max()))), linestyles='dashed',color='black')     
-        #plt.show()
+        #plt.vlines(windowHigh, 0, (float(yvalues.max()+ 0.05*float(yvalues.max()))), linestyles='dashed',color='black')
+        #graphs.append(plt.figure())
+        #####plt.show(block=False)
 
     # Calculating average signal for each concentration, stdev and relative stdev        
     avgSigConc = np.average(avgSigsRun)
     avgSigConc_stdev = np.std(avgSigsRun)
     avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
 
+    if args['verbose']:
+            # Prints the average signal per concentration with standard deviation
+            print("Average signal %.1f µM: %.4f±%.4f RFU" % (conc1, avgSigConc, avgSigConc_stdev))
+            exit
+
     concentration.append(conc1)
     signal.append(avgSigConc)    
     stddev.append(avgSigConc_stdev)
     relstddev.append(avgSigConc_relstdev)
     
-###### FOR VERBOSE
-    #df = pd.DataFrame (forDF).transpose()
-    #df.columns = DFnames
-    #print(df)
+#if args['verbose']:
+            # Average signal per concentration with standard deviation and relative standard deviation
+            #df = pd.DataFrame (forDF).transpose()
+            #df.columns = DFnames
+            #print(df)
+            #exit
     
 
 ## Part 5 - Calculate R values and standard deviation of R values for each concentration
@@ -171,6 +187,7 @@ LowProt_stddev = stddev[0]
 HighProt_stdDev = stddev[numberOfConcs-1]
 
 for y in range(0, numberOfConcs):
+        conc2 = idealSheet.cell(y+1,5).value
         avgSigConc_R = (signal[y] - HighProt_sig)/ (LowProt_sig - HighProt_sig) 
         Rvalue.append(avgSigConc_R)
 
@@ -178,10 +195,19 @@ for y in range(0, numberOfConcs):
                                                                        ((HighProt_sig - signal[y])/(LowProt_sig - HighProt_sig) * LowProt_stddev)**2))
         Rstddev.append(avgSiglConc_Rstddev)
 
-###### FOR VERBOSE
-        #df = pd.DataFrame (forDF).transpose()
-        #df.columns = DFnames
-        #print(df)
+        if args['verbose']:
+            # R value and standard deviation for each concentration
+            print("R value %.1f µM: %.4f±%.4f" % (conc2, avgSigConc_R, avgSiglConc_Rstddev))
+            exit
+
+        
+if args['verbose']:
+            # Summary dataframe of average signal per concentration with standard deviation, relative standard deviation, R value and standard deviation
+            df = pd.DataFrame (forDF).transpose()
+            df.columns = DFnames
+            print(df)
+            exit
+
     
 ## Part 6 - Plotting the binding isotherm R vs P[0] with curve of best fit
 # Plotting data points for each concentration
@@ -193,7 +219,7 @@ plt.xscale("log")
 def LevenMarqu(x,a):          
     return -((a + x - ligandConc)/(2*ligandConc)) + ((((a + x - ligandConc)/(2*ligandConc))**2) + (a/ligandConc))**(0.5)
 
-# Curve fitting and plotting the curve of best fit
+# Curve fitting and plotting curve of best fit
 popt, pcov = curve_fit(LevenMarqu, concentration, Rvalue)
 error = np.sqrt(np.diag(pcov))
 
@@ -203,7 +229,8 @@ plt.ylabel('R')
 plt.xlabel('Concentration of BSA (μM)')
 plt.legend()
 plt.xscale("log")
-plt.show(block=False)
+graphs.append(plt.figure())
+#####plt.show(block=False)
 
 # Statistics
 residuals = Rvalue - LevenMarqu(concentration, *popt)
@@ -214,11 +241,13 @@ r_squared = 1 - (ss_res/ss_tot)
 chiSquared = sum((((Rvalue - LevenMarqu(concentration, *popt))**2) / LevenMarqu(concentration, *popt)))
 
 # Returned/printed values
-print("The Kd is " + str(popt) + " ± " + str(error) + " μM")
-print("The R² value is " + str(r_squared))
-print("The χ² value is " + str(chiSquared))
+print("Kd: %.4f ± %.4f μM" % (popt,error))
+print("R² %.4f" % (r_squared))
+print("χ²: %.4f" % (chiSquared))
 
 # Testing script execution time
 end = time.time()
-print("\n"+str(end-start))
+print("Script run time: %.2f seconds" %(end-start))
 
+# Returning all graphs (separagrams and binding isotherm)
+plt.show()
