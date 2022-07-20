@@ -1,8 +1,9 @@
+
 # First attempt at Working File Preparation from .asc to Excel
 # Makes a working file like idealinputs.xlsx, but called testExcel.xlsx
 
-# 20220716 JL NOTE: natsort dependecy - variables to be passed from GUI, potentially add to GUI entries
-
+#20220716 JL    NOTE: natsort dependecy - variables to be passed from GUI, potentially add to GUI entries
+#20220720 JL    NOTE: adding all experimental parameters
 
 ## Part 1 - Importing the required libraries and sub-libraries required below
 import argparse                                   
@@ -32,10 +33,11 @@ start = time.time()
     #window
     #injectTime
     #ligConc
-    #windowConc                 # Not currently in GUI, but in prACTISed.py
-                                # Might also add ability to name Excel file through GUI
+    #windowConc
 
-directory = "/Users/jess/Documents/practised"       # Would normally be passed from GUI as well
+workingFileName = "testExcel"                       # Would normally be passed from GUI
+directory = "/Users/jess/Documents/practised"       # Would normally be passed from GUI
+#fileType = ".asc"                                  # Only supports .asc files - need to include .txt and .dat files
 
 d = {}
 
@@ -111,16 +113,36 @@ ws = wb.active
 
 # Generate Inputs Sheet
 ws.title = "Inputs"
-ws["A1"] = "Window width (%)"
+ws["A1"] = "Propogation flow rate (µM/min)"
 ws["B1"] = "TBD from GUI"
-ws["A3"] = "Number of Concentrations"
+ws["A2"] = "Injection flow rate (µM/min)"
+ws["B2"] = "TBD from GUI"
+ws["A3"] = "Injection time"
 ws["B3"] = "TBD from GUI"
-ws["A5"] = "Injection time"
+ws["A4"] = "Separation capillary length (cm)"
+ws["B4"] = "TBD from GUI"
+ws["A5"] = "Injection loop length (cm)"
 ws["B5"] = "TBD from GUI"
-ws["A7"] = "Ligand Concentration"
+ws["A6"] = "Protein name"
+ws["B6"] = "TBD from GUI"
+ws["A7"] = "Ligand name"
 ws["B7"] = "TBD from GUI"
-ws["A9"] = "Concentration used to determine peak"
-ws["B9"] = "TBD from GUI"               ## Not currently part of GUI
+ws["A8"] = "Number of Concentrations"
+ws["B8"] = "TBD from GUI"
+ws["A9"] = "Initial Ligand concentration [L]0 (µM)"
+ws["B9"] = "TBD from GUI"
+ws["A10"] = "Type of data (MS) or (F)"
+ws["B10"] = "TBD from GUI"
+ws["A11"] = "[P]0 reference for MS normalization (µM)"
+ws["B11"] = "TBD from GUI"
+ws["A12"] = "Window width (%)"
+ws["B12"] = "TBD from GUI"
+ws["A13"] = "Determination of peak (M) or (P)"
+ws["B13"] = "TBD from GUI"
+ws["A14"] = "Manually determined peaks"
+ws["B14"] = "TBD from GUI" 
+ws["A15"] = "[P]0 used to programmaticlly determine peak"
+ws["B15"] = "TBD from GUI"               
 
 
 for x in range(1,len(d)+1):
@@ -139,7 +161,7 @@ for y in orderedDict:
     
 writer.save()
 writer.close()
-wb.save("testExcel.xlsx")
+wb.save("%s.xlsx" % workingFileName)
 
 # Testing script execution time
 end = time.time()
