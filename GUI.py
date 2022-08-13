@@ -1,11 +1,13 @@
 #20220725 JL    NOTE: Switched to PySimpleGUI, added data analysis and working file preparation as functions (compensation & report WIP)
 #20220809 JL    NOTE: Added compensation with interpolation from simulated, small adjustments to working file and graph formatting (TODO: report)
+#20220912 JL    NOTE: Added pdf report option to GUI (TODO: unicode for Chi character, open pdf)
 
 import PySimpleGUI as sg
 
 import os
 import pathlib
 import glob
+import sys
 
 from PIL import Image, ImageTk
 
@@ -22,9 +24,11 @@ from scipy import interpolate
 from datetime import date
 import time
 from natsort import natsorted
+from fpdf import FPDF
 #from working import workingfileprep
 #from analysis import dataanalysis
 #from compensation import compensate
+#from pdf import report
 
 sg.theme('DarkBlue3')
     
@@ -314,21 +318,21 @@ def workingfileprep(inputPath, propFlow, injectFlow, injectTime, sepLength, sepD
     ws["B9"] = ligandName
     ws["A10"] = "Number of Concentrations"
     ws["B10"] = len(d.keys())
-    ws["A11"] = "Initial Ligand concentration [L]0 (same units as [P]0)"
+    ws["A11"] = "Initial Ligand concentration [L]0 (%sM)" % prefix
     ws["B11"] = ligandConc
     ws["A12"] = "Type of Data"
     ws["B12"] = dataType
-    ws["A13"] = "Compensation procedure (Y) or (N) - recommended for MS data"
+    ws["A13"] = "Compensation procedure"
     ws["B13"] = compYN
     ws["A14"] = "[P]0 reference for MS normalization (%sM)" % prefix
     ws["B14"] = normalConc
     ws["A15"] = "Window width (%)"
     ws["B15"] = windowWidth
-    ws["A16"] = "Determination of peak (M) or (P)"
+    ws["A16"] = "Determination of peak"
     ws["B16"] = peakDet
     ws["A17"] = "Manually determined peaks"
     ws["B17"] = manualPeaks 
-    ws["A18"] = "[P]0 used to programmaticlly determine peak"
+    ws["A18"] = "[P]0 to programmaticlly determine peak"
     ws["B18"] = peakConc
 
 
@@ -355,6 +359,7 @@ def workingfileprep(inputPath, propFlow, injectFlow, injectTime, sepLength, sepD
     return "%s/%s" % (inputPath, workingFileName)
 
 ### Compensation procedure to unmask signal
+
 def compensate (fileName):
 #fileName = "/Users/jess/Documents/practised/ALP.xlsx"
 
@@ -433,9 +438,9 @@ def compensate (fileName):
                 rawSignal = rawSignal.dropna(how='all')
 
                 time = rawSignal['raw time']
-                numberOfRuns = len(rawSignal.columns)-1
+                numberOfRuns = len(rawSignal.columns)
 
-                for run in range(1,int(numberOfRuns)+1):
+                for run in range(1, int(numberOfRuns)):
 
                         # Skip normalization concentration run 1
                         if conc1.partition(" ")[0] != "%s" % normalConc or run != 1:
@@ -484,6 +489,7 @@ def compensate (fileName):
 
 
 ### Analyze data in working file, add outputs and generate graph subfolder of pngs
+
 def dataanalysis(fileName):
         
         # Testing script execution time
@@ -600,7 +606,7 @@ def dataanalysis(fileName):
             # Reading in the whole data frame (= all runs for one particular concentration) and dropping all lines that are blank, i.e. that would produce "NaN"s
             data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
             data = data.dropna(how='all')
-            numberOfRuns = len(data.columns)-1
+            numberOfRuns = len(data.columns)
             
 
             # Calculate background signals for each run
@@ -793,7 +799,95 @@ def dataanalysis(fileName):
 
         return subdirect
 
-    
+### Generate PDF report summary
+
+def report (workingFile, graphFolder):
+    # Read in data tables from working file
+    userInputs = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="A:B", engine='openpyxl')
+    proteinName = str(userInputs.iloc[7,1])
+    userLength = userInputs.shape[0]
+    userInputs = userInputs.values.tolist()
+
+    summaryTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
+    summaryTable = summaryTable.dropna(how='any')
+    sumLength = summaryTable.shape[0]
+    summaryTable = summaryTable.values.tolist()
+
+    kdTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
+    kdTable = kdTable.dropna(how='any')
+    kdTable = kdTable.values.tolist()
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Times', size=10)
+
+    pdf.cell(pdf.epw/2, pdf.font_size*2, '%s_%s' % (proteinName,date.today()))
+
+    current = pdf.get_y() +5
+    pdf.set_y(current)
+    pdf.image("%s/bindingisotherm.png" % (graphFolder), w = pdf.epw/2)
+    pdf.set_y(current)
+    pdf.image("%s/allconcentration.png" % (graphFolder), w = pdf.epw/2, x = pdf.epw/2)
+
+    # Add summary table to pdf
+    current = pdf.get_y() + 5
+    pdf.set_y(current)
+    for row in summaryTable:
+        pdf.set_x(2.5*(pdf.epw/5))
+        
+        for col in row:
+            pdf.multi_cell(pdf.epw/12 , pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add Kd and statistics to pdf
+    pdf.set_y(current + pdf.font_size*2*sumLength + 5)
+    for row in kdTable:
+        pdf.set_x(2.5*(pdf.epw/5))
+        
+        for col in row:
+            if col.find('χ') != -1:
+                col = col.replace("χ", "Chi")
+            pdf.multi_cell(pdf.epw/4 , pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add user input table to pdf
+    pdf.set_y(current)
+
+    for row in userInputs:
+        for col in row:
+            pdf.multi_cell(pdf.epw/5, pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add separagram images to pdf
+    images = natsorted(glob.glob('%s/*.png' % graphFolder))
+    pdf.add_page()
+    pos = 0.2
+    graphY = pdf.get_y()
+
+    for img in images:
+        if img.endswith('M.png'):
+            if pos < 3:
+                pdf.set_y(graphY)
+                pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
+                pdf.ln(0)
+                pos +=1
+                
+                
+            elif pos == 3.2:
+                pos = 0.2
+                graphY = pdf.get_y()+5
+                pdf.set_y(graphY)
+                pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
+                pos = 1.2
+
+    currentFolder = os.path.dirname(workingFile)
+    pdfNAME = '%s/%s_%s' % (currentFolder, proteinName, date.today())
+    pdf.output(pdfNAME)
+
+
 
 ######### EVENT LOOP ##############
 while True:
@@ -959,6 +1053,9 @@ while True:
         else:
              location -=1
         load_image(images[location], window)
+
+    if event == 'report':
+        report(workingFile, graphPath) 
 
     
 window.close()
