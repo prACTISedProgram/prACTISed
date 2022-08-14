@@ -25,6 +25,7 @@ from datetime import date
 import time
 from natsort import natsorted
 from fpdf import FPDF
+import webbrowser
 #from working import workingfileprep
 #from analysis import dataanalysis
 #from compensation import compensate
@@ -886,7 +887,7 @@ def report (workingFile, graphFolder):
     currentFolder = os.path.dirname(workingFile)
     pdfNAME = '%s/%s_%s' % (currentFolder, proteinName, date.today())
     pdf.output(pdfNAME)
-
+    webbrowser.open_new('file://%s' % pdfNAME)
 
 
 ######### EVENT LOOP ##############
