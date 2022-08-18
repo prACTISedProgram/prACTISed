@@ -1,6 +1,7 @@
 #20220725 JL    NOTE: Switched to PySimpleGUI, added data analysis and working file preparation as functions (compensation & report WIP)
 #20220809 JL    NOTE: Added compensation with interpolation from simulated, small adjustments to working file and graph formatting (TODO: report)
 #20220912 JL    NOTE: Added pdf report option to GUI (TODO: unicode for Chi character, open pdf)
+#20220918 JL    NOTE: Beginning of error trapping, minor refactoring, rearranging GUI, implicit R=[P]0 for programmatic peak determination (TODO: add .dat files to workingfileprep)
 
 import PySimpleGUI as sg
 
@@ -30,62 +31,64 @@ import webbrowser
 #from analysis import dataanalysis
 #from compensation import compensate
 #from pdf import report
+#from validate import *
 
 sg.theme('DarkBlue3')
-    
+
+# Building input column for GUI    
 inputCol = [
     [sg.Frame('Fluidics Experimental Parameters', 
-              [[sg.Text('Propagation flow rate', size=(25,1), key ='propFlow'),
-                sg.Input(size=(10,1), key='propFlow_val')],
-               [sg.Text('Injection flow rate', size=(25,1),key='injectFlow'),
-                sg.Input(size=(10,1), key='injectFlow_val')],
-               [sg.Text('Injection time (s)', size=(25,1), key='injectTime'),
-                sg.Input(size=(10,1), key='injectTime_val')],
-               [sg.Text('Separation capillary length', size=(25,1), key='sepLength'),
-                sg.Input(size=(10,1), key='sepLength_val')],
-               [sg.Text('Separation capillary diameter', size=(25,1), key='sepDiam'),
-                sg.Input(size=(10,1), key='sepDiam_val')],
-               [sg.Text('Injection loop length', size=(25,1), key='injectLength'),
-                sg.Input(size=(10,1), key='injectLength_val')],
-               [sg.Text('Injection loop diameter', size=(25,1), key='injectDiam'),
-                sg.Input(size=(10,1), key='injectDiam_val')]],
+              [[sg.Text('Propagation flow rate', size=(27,1), key ='propFlow'),
+                sg.Input(size=(14,1), key='propFlow_val')],
+               [sg.Text('Injection flow rate', size=(27,1),key='injectFlow'),
+                sg.Input(size=(14,1), key='injectFlow_val')],
+               [sg.Text('Injection time (s) *', size=(27,1), key='injectTime'),
+                sg.Input(size=(14,1), key='injectTime_val')],
+               [sg.Text('Separation capillary length', size=(27,1), key='sepLength'),
+                sg.Input(size=(14,1), key='sepLength_val')],
+               [sg.Text('Separation capillary diameter', size=(27,1), key='sepDiam'),
+                sg.Input(size=(14,1), key='sepDiam_val')],
+               [sg.Text('Injection loop length', size=(27,1), key='injectLength'),
+                sg.Input(size=(14,1), key='injectLength_val')],
+               [sg.Text('Injection loop diameter', size=(27,1), key='injectDiam'),
+                sg.Input(size=(14,1), key='injectDiam_val')]],
               key = 'fluidParam')],
 
 
     [sg.Frame('Concentrations', 
-              [[sg.Text('Protein name', size=(25,1), key ='protName'),
-                sg.Input(size=(10,1), key='protName_val')],
-               [sg.Text('Ligand name', size=(25,1), key='ligName'),
-                sg.Input(size=(10,1), key='ligName_val')],
-               [sg.Text('Initial ligand concentration [L]0 \n (same units as [P]0)', key='ligConc'),
-                sg.Input(size=(10,1), key='ligConc_val')]],
+              [[sg.Text('Protein name *', size=(27,1), key ='protName'),
+                sg.Input(size=(14,1), key='protName_val')],
+               [sg.Text('Ligand name', size=(27,1), key='ligName'),
+                sg.Input(size=(14,1), key='ligName_val')],
+               [sg.Text(u'Initial ligand concentration [L]\u2080 *    \n (same units as [P]\u2080)', key='ligConc'),
+                sg.Input(size=(14,1), key='ligConc_val')]],
               key='concFrame')],
     
     [sg.Frame('Data Analyis Parameters',
-              [[sg.Text('Type of data', size=(11,1), key ='dataType'),
+              [[sg.Text('Type of data *', size=(11,1), key ='dataType'),
                 sg.Radio('Fluoresence', 'dataChoice', key ='dataF', enable_events=True),
                 sg.Radio('Mass Spec', 'dataChoice', key ='dataMS', enable_events=True)],
-               [sg.Text('Compensation procedure \n (recommended for MS data)', key ='comp'),
+               [sg.Text('Compensation procedure *     \n (recommended for MS data)', key ='comp'),
                 sg.Radio('Yes', 'compChoice', key ='compYes', enable_events=True),
                 sg.Radio('No', 'compChoice', key ='compNo', enable_events=True)],
-               [sg.Text('[P]0 reference for normalization', size=(30,1), key='normConc', visible=False),
-                sg.Input(size=(10,1), key='normConc_val', visible=False)],
-               [sg.Text('Window width (%)', size=(30,1), key='window'),
-                sg.Input(size=(10,1), key='window_val')],
-               [sg.Text('Determination of peak', size=(17,1), key ='peak'),
+               [sg.Text(u'[P]\u2080 reference for normalization *', size=(27,1), key='normConc', visible=False),
+                sg.Input(size=(14,1), key='normConc_val', visible=False)],
+               [sg.Text('Window width (%) *', size=(27,1), key='window'),
+                sg.Input(size=(14,1), key='window_val')],
+               [sg.Text('Determination of peak *', size=(18,1), key ='peak'),
                 sg.Radio('Manual', 'peakChoice', key ='peakM', enable_events=True),
                 sg.Radio('Program', 'peakChoice', key ='peakP', enable_events=True)],
-               [sg.Text('Peaks for concentrations [P]0 \n (ascending [P]0, separated by commas)', key='manPeaks', visible=False)],
-               [sg.Input(size=(42,1), key='manPeaks_val', visible=False)],
-               [sg.Text('Specify [P]0 used to determine peak', size=(30,1), key='progPeak', visible=False),
-                sg.Input(size=(10,1), key='progPeak_val', visible=False)]],
+               [sg.Text(u'Peaks for concentrations [P]\u2080 * \n (ascending [P]\u2080, separated by commas)', key='manPeaks', visible=False)],
+               [sg.Input(size=(43,1), key='manPeaks_val', visible=False)],
+               [sg.Text(u'Specify [P]\u2080 used to determine peak *', size=(30,1), key='progPeak', visible=False),
+                sg.Input(size=(11,1), key='progPeak_val', visible=False)]],
               key='analysisParam')],
     
-    [sg.Button('Calculate Kd', key='calculate', disabled=True, disabled_button_color='gray'),
-     sg.Button('Report', key='report', visible=False)]
+    [sg.Text('* Required field', key = 'req'),]
     ]
 
-        
+
+# Builing output column for GUI        
 outputCol= [
     [sg.Table(values=[],headings=['prACTISed output'], key='Kd', hide_vertical_scroll=True, def_col_width=20, auto_size_columns=False)],
 
@@ -97,37 +100,469 @@ outputCol= [
                 sg.Button('Next', key='fwd')]]
                )]           
     ]
-    
 
-layout = [
-    [sg.Text('File path', key ='filePath'),
+# Building file path column for GUI
+filePathCol= [
+    [sg.Text('File path *', key ='filePath'),
      sg.Input(size=(50,1), key='filePath_val'),
      sg.Button('Validate', key='validate')],
     [sg.Text('Working File Entered', key='work', visible=False),
      sg.Text('Raw Data Directory Entered', key='rawData', visible=False),
-     sg.Text('Invalid File Path Entered', key='invalid', visible=False)],
+     sg.Text('Invalid File Path Entered', key='invalid', visible=False)]
+    ]
     
-    [sg.Column(inputCol), sg.Column(outputCol, visible=False, key='out')]
+    
+# Compiling all columns into window layout
+layout = [
+    [sg.Column(filePathCol, key='filePathCol', element_justification='c')],
+    [sg.Column(inputCol, justification='center', key='in'), sg.Column(outputCol, visible=False, key='out')],
+    [sg.Button('Calculate Kd', key='calculate', disabled=True, disabled_button_color='gray'),
+     sg.Button('Report', key='report', visible=False)]
     ]
 
-window = sg.Window("prACTISed", layout, finalize=True)
+window = sg.Window("prACTISed", layout, finalize=True, element_justification='c')
 
 
 ######### DEFINE FUNCTIONS ##############
 
-# Display image from file path
+# Display image from file path - for GUI image viewer
 def load_image(path,window):
     img = Image.open(path)
-    img.thumbnail((350, 350))
+    img.thumbnail((350,350))       # (420, 420) is same width as summary  table
     photo_img = ImageTk.PhotoImage(img)
     window['graphImage'].update(data=photo_img)
 
 location = 0
 
 
-### Generate working file from directory containing raw data (.txt or .asc)
 
-def workingfileprep(inputPath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
+
+
+# Subfunctions for validating GUI user inputs 
+def valFloat (x):       # percentage, injection time, ligandConc, windowConc
+    try:
+        float(x)
+        return [True, float(x)]
+    except ValueError:
+        return [False, 'Expected a numerical unitless value, please try again']
+
+def valStr (x):    # non-mandatory user inputs, protein name 
+    try:
+        str(x)
+        return [True, str(x)]
+    except ValueError:
+        return [False, 'Expected a string, please try again']
+
+def valManualTimes (x):
+    valStr(x)
+    try:
+        x = x.split(",")
+        for time in x:
+            float(x)
+        return [True, x]
+    except:
+        return [False, 'Expected list of numerical times separated by commas, please try again']
+
+### Validating required fields of GUI user inputs (see above for associated sub-functions)      
+def confirmRequired (values):
+    is_input = True
+    values_missing = []
+    is_valid = True
+    values_invalid = []
+
+    if len(values['injectTime_val'])==0:
+        values_missing.append('Injection time')
+        is_input = False
+    elif len(values['injectTime_val'])>0:
+        check = valFloat(values['injectTime_val'])
+        if check[0] == False:
+            values_invalid.append('Injection time - %s' % check[1])
+            is_valid = False
+
+    if len(values['protName_val'])==0:
+        values_missing.append('Protein name')
+        is_input = False
+    elif len(values['protName_val'])>0:
+        check = valStr(values['protName_val'])
+        if check[0] == False:
+            values_invalid.append('Protein name - %s' % check[1])
+            is_valid = False
+
+    if len(values['ligConc_val'])==0:
+        values_missing.append(u'Initial ligand concentration [L]\u2080')
+        is_input = False
+    elif len(values['ligConc_val'])>0:
+        check = valFloat(values['ligConc_val'])
+        if check[0] == False:
+            values_invalid.append(u'Initial ligand concentration [L]\u2080 - %s' % check[1])
+            is_valid = False
+
+    if not values['dataF'] and not values['dataMS']:
+        values_missing.append('Type of data')
+        is_input = False
+
+    if not values['compYes'] and not values['compNo']:
+        values_missing.append('Compensation procedure')
+        is_input = False
+
+    if values['compYes'] and len(values['normConc_val'])==0:
+        values_missing.append(u'[P]\u2080 reference for normalization')
+        is_input = False
+    elif values['compYes'] and len(values['normConc_val'])>0:
+        check = valFloat(values['normConc_val'])
+        if check[0] == False:
+            values_invalid.append(u'[P]\u2080 reference for normalization - %s' % check[1])
+            is_valid = False
+
+    if len(values['window_val'])==0:
+        values_missing.append('Window width')
+        is_input = False
+    elif len(values['window_val'])>0:
+        check = valFloat(values['window_val'])
+        if check[0] == False:
+            values_invalid.append('Window width' % check[1])
+            is_valid = False
+
+    if not values['peakM'] and not values['peakP']:
+        values_missing.append('Determination of peak')
+        is_input = False
+
+    if  values['peakM'] and len(values['manPeaks_val'])==0:
+        values_missing.append('Peaks for concentrations')
+        is_input = False
+    elif values['peakM'] and len(values['manPeaks_val'])>0:
+        check = valManualTimes(values['manPeaks_val'])
+        if check[0] == False:
+            values_invalid.append('Peaks for concentrations - %s' % check[1])
+            is_valid = False
+
+    if  values['peakP'] and len(values['progPeak_val'])==0:
+        values_missing.append(u'[P]\u2080 used to determine peak')
+        is_input = False
+    elif values['peakP'] and len(values['progPeak_val'])>0:
+        check = valFloat(values['progPeak_val'])
+        if check[0] == False:
+            values_invalid.append(u'[P]\u2080 used to determine peak - %s' % check[1])
+            is_valid = False
+
+    result = [is_input, values_missing, is_valid, values_invalid]
+    return result
+
+# Generate error message for validation of GUI user inputs
+def genErrorMessage (values_missing, values_invalid):
+    errorMessage = ''
+    for val in values_missing:
+        errorMessage += ('\nMissing' + ": " + val)
+    for val in values_invalid:
+        errorMessage += ('\nInvalid' + ": " + val)
+    return errorMessage
+
+###
+def valConc (x):
+    valStr(x)
+    try:
+        molar = x.find("M")
+        prefix = x[molar-1]
+        y = float(x.partition(prefix)[0])
+        return [True, '%s %sM' % (y, prefix)]
+    except:
+        return [False, 'Expected file name to start with concentration with units, please try again']
+
+def validateDirectoryContents (filePath, compYN, normalConc, peakDet, peakConc):
+    fileErrors=[]
+    filesValid =True
+    simData = False
+    rawData = False
+    normConc = False
+    pPeak = False
+    
+    if len(os.listdir(filePath)) == 0:
+        fileErrors.append('Error: Given file directory %s is empty, please try again' % (filePath))
+        filesValid = False
+    
+    for file in os.listdir(filePath):
+        if not file.startswith('simulated') and os.path.splitext(file)[1] in (".txt", ".asc"):
+            rawData = True
+            preCheck = valConc(file)
+            if preCheck[0] == False:
+                fileErrors.append('Error: File name %s does not follow prefix conventions - %s' % (file, preCheck[1]))
+                filesValid = False
+            if preCheck[0] == True and peakDet== "P":
+                molar = file.find("M")
+                prefix = file[molar-1]
+                if float(file.partition(prefix)[0]) == peakConc:
+                    pPeak = True
+                if type(normalConc)==float:
+                    if float(file.partition(prefix)[0]) == normalConc:
+                        normConc = True
+            
+            endCheck = os.path.splitext(file)[0]
+            if not endCheck[-1].isnumeric:
+                fileErrors.append('Error: File name %s does not follow suffix conventions - Expected file name to end with run number,  please try again' % (file))
+                filesValid = False
+                                  
+        if file.startswith('simulated') and os.path.splitext(file)[1] == '.txt':
+            simData = True
+
+    if compYN =="Y" and simData==False:
+            fileErrors.append('Error: No simulated protein profile .txt file beginning with simulated found in file directory %s , please try again' % (filePath))
+            filesValid = False
+    if compYN =="Y" and normConc==False:
+            fileErrors.append(u'Error: No files found for indicated [P]\u2080 = %s used for normalization' % (normalConc))
+            filesValid = False
+        
+    if rawData == False:
+        fileErrors.append('Error: No .asc or .txt raw data files found in %s' % (filePath))
+        filesValid = False
+
+    if peakDet=="P" and pPeak == False:
+        fileErrors.append(u'Error: No files found for indicated [P]\u2080 = %s used to programmaticlly determine peak' % (peakConc))
+        filesValid = False
+        
+    return [filesValid, fileErrors]
+                
+# Generate error message for validating directory to raw data files (& simulated protein profile)
+def genErrorMessageDirect (fileErrors):
+    errorMessage = ''
+    for val in fileErrors:
+        errorMessage += ('\n'+ val)
+    return errorMessage
+
+
+### Check if file with same name exists, check if user wants to overwrite
+def checkForOverwriting (suggestedFilePath):
+    exists = False
+    exists_Name = ''
+    if os.path.exists(suggestedFilePath)== False:
+        return [exists, suggestedFilePath]
+
+    elif os.path.exists(suggestedFilePath)== True:
+        exists = True
+        exists_Name = suggestedFilePath
+        for duplicate in range(2,9):
+            withoutExt = os.path.splitext(suggestedFilePath)[0]
+            temp = "%s_%d.xlsx" % (withoutExt, duplicate)
+
+            if os.path.exists(temp)== False:
+                suggestedFilePath=temp
+                return [exists, suggestedFilePath]
+                break
+
+
+### Subfunctions for validating Excel workbook
+def valDataType (x):
+    valStr(x)
+    if x == "F" or x == 'f' or "F" in x or 'f' in x:
+        return [True, "F"]
+    elif x == "MS" or x == 'ms' or "MS" in x or 'ms' in x:
+        return [True, "MS"]
+    else:
+        return [False, 'Expected F or MS, please try again']
+
+
+def valComp (x):
+    valStr(x)
+    if x == "Y" or x == 'y' or "Y" in x or 'y' in x:
+        return [True, "Y"]
+    elif x == "N" or x == 'n' or "N" in x or ('n' in x and 'en' not in x):
+        return [True, "N"]
+    elif x == "Compensated" or x == "compensated" or "ompensate" in x:
+        return [True, "Compensated"]
+    else:
+        return [False, 'Expected Y, N or Compensated, please try again']
+    
+
+def valPeakDetermination (x):
+    valStr(x)
+    if x == "P" or x == 'p' or "P" in x or 'p' in x:
+        return [True, "P"]
+    elif x == "M" or x == 'm' or "M" in x or 'm' in x:
+        return [True, "M"]
+    else:
+        return [False, 'Expected P or M, please try again']
+    
+
+def valManualTimes (x, numConcs, injectTime):
+    valStr(x)
+    try:
+        times_valid = True
+        y = x.split(",")
+        if len(y) != numConcs:
+            return [False, 'Error: Manually determined peaks - Expected %s times,  %s inputted' % (numConcs, len(y))]
+        for time in y:
+            if time < injectTime:
+                times_valid = False
+                return [False, 'Error: Manually determined peaks - Expected times greater than injection time %s s' % injectTime]
+                break
+        if len(y)==numConcs and times_valid==True:
+                return [True, str(x)]
+    except:
+        return [False, 'Expected list of times separated by commas, please try again']
+    
+
+def valConc (x):
+    valStr(x)
+    try:
+        molar = x.find("M")
+        prefix = x[molar-1]
+        y = float(x.partition(prefix)[0])
+        return [True, '%s %sM' % (y, prefix)]
+    except:
+        return [False, 'Expected concentration with units, please try again']
+    
+### Validating an Excel workbook for expected sheets and mandatory fields (see above for associated sub-functions)
+def validateExcel (filePath):
+    
+    # Validate file path is for an Excel workbook
+    inputErrors = []
+    is_valid = True
+    if not os.path.exists(filePath):
+        inputErrors.append('Error: Path %s does not exist' % filePath)
+        is_valid=False
+        
+    if not os.path.isfile(filePath):
+         inputErrors.append('Error: %s is not a valid file path' % filePath)
+         is_valid=False
+        
+    if not filePath.endswith(".xlsx"):
+        inputErrors.append('Error: %s is not a valid Excel file' % filePath)
+        is_valid=False
+         
+    if os.path.isfile(filePath) and filePath.endswith(".xlsx"):
+        data = pd.read_excel(filePath, engine='openpyxl')
+        inputBook = load_workbook(filePath, data_only=True)
+        sheets = inputBook.sheetnames
+
+        # TODO: Confirm Excel workbook is not open, confirm permissions for reading/writing Excel workbook
+
+        # Verify there is a sheet named Inputs
+        if 'Inputs' not in sheets:
+            return "Error: No sheet named Inputs found in Excel workbook %s" % filePath
+
+        # If Inputs sheet exists, confirm all mandatory inputs
+        elif 'Inputs' in sheets:
+            idealSheet = inputBook["Inputs"]
+            
+            windowCheck = valFloat(idealSheet.cell(15,2).value)
+            if windowCheck[0]!=True:
+                inputErrors.append('Error: Window width - %s' % windowCheck[1])
+                is_valid = False
+
+            numConcCheck = valFloat(idealSheet.cell(10,2).value)
+            if numConcCheck[0]!=True:
+                inputErrors.append('Error: Number of Concentrations - %s' % numConcCheck[1])
+                is_valid = False
+            
+            injectTimeCheck = valFloat(idealSheet.cell(3,2).value)
+            if injectTimeCheck[0]!=True:
+                inputErrors.append('Error: Injection time - %s' % injectTimeCheck[1])
+                is_valid = False
+                            
+            ligandConcCheck = valFloat(idealSheet.cell(11,2).value)
+            if ligandConcCheck[0]!=True:
+                inputErrors.append('Error: Initial Ligand concentration - %s' % ligandConcCheck[1])
+                is_valid = False
+                                   
+            proteinNameCheck = valStr(idealSheet.cell(8,2).value)
+            if proteinNameCheck[0]!=True:
+                inputErrors.append('Error: Protein name - %s' % proteinNameCheck[1])
+                is_valid = False
+                                   
+            # Validate data type
+            dataTypeCheck = valStr(idealSheet.cell(12,2).value)
+            if dataTypeCheck[0]!=True:
+                inputErrors.append('Error: Data Type - %s' % dataTypeCheck[1])
+                is_valid = False
+            elif dataTypeCheck[0]==True:
+                secondCheck = valDataType(dataTypeCheck[1])
+                if secondCheck[0] == True:
+                    idealSheet['B12'] = secondCheck[1]
+                elif secondCheck[0] == False:
+                    inputErrors.append('Error: Data Type - %s' % secondCheck[1])
+                    is_valid = False
+
+            # Validate compensation specification
+            compYNCheck = valStr(idealSheet.cell(13,2).value)
+            if compYNCheck[0]!=True:
+                inputErrors.append('Error: Compensation procedure - %s' % compYNCheck[1])
+                is_valid = False
+            elif compYNCheck[0]==True:
+                secondCheck = valComp(compYNCheck[1])
+                if secondCheck[0] == True:
+                    idealSheet['B13'] = secondCheck[1]
+
+                    if secondCheck[1] == "Y":
+                        normalConcCheck = valFloat(idealSheet.cell(14,2).value)
+                        if normalConcCheck[0] == False:
+                            inputErrors.append('Error: Compensation procedure - %s' % secondCheck[1])
+                            is_valid = False
+                            
+                        if 'P_simulated' not in sheets:
+                            inputErrors.append("Error: No sheet named P_simulated found in Excel workbook %s" % filePath)
+                            is_valid = False          
+                            
+                elif secondCheck[0] == False:
+                    inputErrors.append('Error: Compensation procedure - %s' % secondCheck[1])
+                    is_valid = False
+
+            # Validate peak determination method and dependent manual or programmatic times
+            peakDetCheck = valStr(idealSheet.cell(16,2).value)
+            if peakDetCheck[0]!=True:
+                inputErrors.append('Error: Determination of peak - %s' % dataTypeCheck[1])
+                is_valid = False
+            elif peakDetCheck[0]==True:
+                secondCheck = valPeakDetermination(peakDetCheck[1])
+                if secondCheck[0] == False:
+                    inputErrors.append('Error: Determination of peak - %s' % secondCheck[1])
+                    is_valid = False
+                elif secondCheck[0] == True:
+                    idealSheet['B16'] = secondCheck[1]
+
+                    if secondCheck[1] == "M":
+                        if numConcCheck[0]==True and injectTimeCheck[0]==True:
+                            manualTimesCheck = valManualTimes(idealSheet.cell(17,2).value, numConcCheck[1], injectTimeCheck[1])
+                            if manualTimesCheck[0] == False:
+                                inputErrors.append('Error: Manually determined peaks - %s' % secondCheck[1])
+                                is_valid = False
+                                
+                    elif secondCheck[1] == "P":
+                        pPeakCheck = valFloat(idealSheet.cell(18,2).value)
+                        if pPeakCheck[0]==False:
+                            inputErrors.append(u'Error: [P]\u2080 used to determine peak - %s' % pPeakCheck[1])
+                            is_valid = False
+
+            if numConcCheck[0]==True:
+                for  x in range(1,int(numConcCheck[1])+1):
+                    concCheck = valConc(idealSheet.cell(x,5).value)
+                    if concCheck[0]==False:
+                        inputErrors.append('Error: Listed concentrations - %s' % concCheck[1])
+                        is_valid = False
+                    elif concCheck[0]==True:
+                        idealSheet['%s5' % get_column_letter(x)] = secondCheck[1]
+                        if concCheck[1] not in sheets:
+                            inputErrors.append('Error: No sheet named %s found in Excel workbook %s' % (concCheck[1],filePath))
+                            is_valid = False
+                        
+                        elif concCheck[1] in sheets:
+                            df = pd.read_excel(filePath, sheet_name=concCheck[1], engine='openpyxl')
+                            df = df.dropna(how='all')
+                
+                            if df.columns[0] != 'raw time':
+                                inputErrors.append('Error: No raw time column found in %s sheet of Excel workbook %s' % (concCheck[1],filePath))
+                                is_valid = False
+                                                          
+    return [is_valid, inputErrors]
+
+# Generate error message for validation of Excel workbook                                    
+def genFileErrorMessage(inputErrors):
+    errorMessage = ''
+    for val in inputErrors:
+        errorMessage += ('\n' + val)
+    return errorMessage
+
+
+
+def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
                     injectLength, injectDiam, proteinName, ligandName, ligandConc,
                     dataType, compYN, normalConc, windowWidth, peakDet, manualPeaks, peakConc):
 
@@ -204,10 +639,13 @@ def workingfileprep(inputPath, propFlow, injectFlow, injectTime, sepLength, sepD
             # Extract concentration and run number from file name (see naming conventions)
             conc = float(file.partition(prefix)[0])
 
-            if file[-5].isnumeric:              
-                runNumber= int(file[-6:-4])         
-
-            else:
+            name = os.path.splitext(file)[0]
+            if name[-1].isdigit()==True: 
+                 if name[-2:].isdigit()==True: 
+                    runNumber= int(name[-2:])
+                 else:
+                    runNumber= int(name[-1])
+            elif name[-1] == ' ':
                 runNumber=1
 
             # Extract the preamble information
@@ -278,88 +716,55 @@ def workingfileprep(inputPath, propFlow, injectFlow, injectTime, sepLength, sepD
 
     if prefix == "u":
         prefix = "µ"
-            
-    workingFileName = "%s_%s.xlsx" % (proteinName, date.today())
 
-    if os.path.exists("%s/%s" % (inputPath, workingFileName)) == True:
-        wb = load_workbook("%s/%s" % (inputPath, workingFileName))
-        writer = pd.ExcelWriter("%s/%s" % (inputPath, workingFileName), engine='openpyxl')
-        writer.book = wb
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inputs"
 
-        writer.sheets = dict((ws.title, ws) for ws in wb.worksheets)
-        ws = wb["Inputs"]
-
-    elif os.path.exists("%s/%s" % (inputPath, workingFileName)) == False:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Inputs"
-
-        writer = pd.ExcelWriter("%s/%s" % (inputPath, workingFileName), engine = 'openpyxl')
-        writer.book = wb
-        
+    writer = pd.ExcelWriter(workingFilePath, engine = 'openpyxl')
+    writer.book = wb
         
     # Generate Inputs Sheet
-    ws["A1"] = "Propogation flow rate"
-    ws["B1"] = propFlow
-    ws["A2"] = "Injection flow rate"
-    ws["B2"] = injectFlow
-    ws["A3"] = "Injection time (s)"
-    ws["B3"] = injectTime
-    ws["A4"] = "Separation capillary length"
-    ws["B4"] = sepLength
-    ws["A5"] = "Separation capillary diameter"
-    ws["B5"] = sepDiam
-    ws["A6"] = "Injection loop length"
-    ws["B6"] = injectLength
-    ws["A7"] = "Injection loop diameter"
-    ws["B7"] = injectDiam
-    ws["A8"] = "Protein name"
-    ws["B8"] = proteinName
-    ws["A9"] = "Ligand name"
-    ws["B9"] = ligandName
-    ws["A10"] = "Number of Concentrations"
-    ws["B10"] = len(d.keys())
-    ws["A11"] = "Initial Ligand concentration [L]0 (%sM)" % prefix
-    ws["B11"] = ligandConc
-    ws["A12"] = "Type of Data"
-    ws["B12"] = dataType
-    ws["A13"] = "Compensation procedure"
-    ws["B13"] = compYN
-    ws["A14"] = "[P]0 reference for MS normalization (%sM)" % prefix
-    ws["B14"] = normalConc
-    ws["A15"] = "Window width (%)"
-    ws["B15"] = windowWidth
-    ws["A16"] = "Determination of peak"
-    ws["B16"] = peakDet
-    ws["A17"] = "Manually determined peaks"
-    ws["B17"] = manualPeaks 
-    ws["A18"] = "[P]0 to programmaticlly determine peak"
-    ws["B18"] = peakConc
+    inputDictionary = {"Propogation flow rate":propFlow, "Injection flow rate":injectFlow, "Injection time (s)":injectTime,
+                       "Separation capillary length":sepLength, "Separation capillary diameter":sepDiam,
+                       "Injection loop length":injectLength, "Injection loop diameter":injectDiam, "Protein name":proteinName,
+                       "Ligand name":ligandName, "Number of Concentrations":len(d.keys()),
+                       "Initial Ligand concentration [L]0 (%sM)" % prefix: ligandConc, "Type of Data":dataType,
+                       "Compensation procedure": compYN, "[P]0 reference for MS normalization (%sM)" % prefix: normalConc,
+                       "Window width (%)": windowWidth, "Determination of peak": peakDet, "Manually determined peaks":manualPeaks,
+                       "[P]0 to programmaticlly determine peak":peakConc
+                       }
 
-
+    for key in inputDictionary:
+        row = list(inputDictionary.keys()).index(key)+1
+        ws["A%s" % row] = key
+        ws["B%s" % row] = inputDictionary[key]
+                   
     for x in range(1,len(d)+1):
         ws["D"+str(x)] = "Protein Conc. #" + str(x)
         ws["E"+str(x)] = "%s %sM" % (orderedDict[x-1], prefix)
 
 
+   # Add simulated protein profile if compensation required
     if compYN == "Y":
         simulated.to_excel(writer, sheet_name = "P_simulated", index=False)
 
+    # Add sheet for each concentration dataframe
     for y in orderedDict:
         d[y].to_excel(writer, sheet_name = "%s %sM" % (y, prefix), index=False)
             
     writer.save()
     writer.close()
-    wb.save("%s/%s" % (inputPath,workingFileName))
+    wb.save(workingFilePath)
 
 
     # Testing script execution time
     end = time.time()
     print("Script run time: %.2f seconds" %(end-start))
 
-    return "%s/%s" % (inputPath, workingFileName)
+    return workingFilePath
 
-### Compensation procedure to unmask signal
+
 
 def compensate (fileName):
 #fileName = "/Users/jess/Documents/practised/ALP.xlsx"
@@ -377,119 +782,116 @@ def compensate (fileName):
         normalConc = "%s %s" % (normalConc, unit)
         compYN = str(idealSheet.cell(13,2).value)
 
-        if compYN == 'Compensated':
-                sys.exit("Compensation procedure has alredy been applied to this working file")
+        if compYN == 'Y':
         
+                # Get dimensionless simulated separagram of pure protein, S̃p, and interpolate signals
+                simulated = pd.read_excel(fileName, sheet_name='P_simulated', engine='openpyxl')
 
-        # Get dimensionless simulated separagram of pure protein, S̃p, and interpolate signals
-        simulated = pd.read_excel(fileName, sheet_name='P_simulated', engine='openpyxl')
+                # Interpolate signals from simulated protein profile
+                timeSim = simulated['raw time']
+                sigSim = simulated['signal']
+                interp = interpolate.splrep(timeSim, sigSim)
 
-        # Interpolate signals from simulated protein profile
-        timeSim = simulated['raw time']
-        sigSim = simulated['signal']
-        interp = interpolate.splrep(timeSim, sigSim)
+                # Isolate interrpolated signals at for times in raw data files
+                rawData = pd.read_excel(fileName, sheet_name=normalConc, engine='openpyxl')
+                rawData = rawData.dropna(how='all')
+                rawTime = rawData['raw time']
+                interpSigs = interpolate.splev(rawTime, interp, der=0)
 
-        # Isolate interrpolated signals at for times in raw data files
-        rawData = pd.read_excel(fileName, sheet_name=normalConc, engine='openpyxl')
-        rawData = rawData.dropna(how='all')
-        rawTime = rawData['raw time']
-        interpSigs = interpolate.splev(rawTime, interp, der=0)
+                # Normalize signals, remove negative values and generate data frame
+                interpSigs = pd.Series(interpSigs, name='signal')
+                interpSigs = interpSigs.div(max(interpSigs))
+                interpSigs[interpSigs < 0] = 0
+                simulatedSigs = pd.concat([rawTime,interpSigs], axis=1)
 
-        # Normalize signals, remove negative values and generate data frame
-        interpSigs = pd.Series(interpSigs, name='signal')
-        interpSigs = interpSigs.div(max(interpSigs))
-        interpSigs[interpSigs < 0] = 0
-        simulatedSigs = pd.concat([rawTime,interpSigs], axis=1)
+                # Get integrated signal of normalization concentration
+                integratedNorm = []
 
-        # Get integrated signal of normalization concentration
-        integratedNorm = []
-
-        # Isolate first run of concentration used to normalize
-        rawSignal = pd.read_excel(fileName, sheet_name=normalConc, engine='openpyxl')
-        rawSignal = rawSignal.dropna(how='all')
-        rawSignal = rawSignal.iloc[:,:2]
-
-        time = rawSignal['raw time']
-        sig = rawSignal[rawSignal.columns[1]]
-        colName = str(rawSignal.columns[1])
-
-        # Average the background signals for first 5 secs, subtract from all signals
-        background = sig[time < injectTime].mean()
-        rawSignal.iloc[:,1] = rawSignal.iloc[:,1].sub(background)
-
-        # Multiply raw signal by Sp
-        rawSignal.iloc[:,1] = rawSignal.iloc[:,1].mul(simulatedSigs.iloc[:,1])
-
-        # Normalize and remove negative signals
-        rawSignal.iloc[:,1] = rawSignal.iloc[:,1].mul(1)
-        rawSignal.loc[(rawSignal[colName] < 0), colName] = 0
-        normArea = rawSignal.iloc[:,1].sum()
-
-        # Add concentration to dictionary
-        d[normalConc]= rawSignal
-                
-
-        # Apply Sp and normalization to all other concentrations and runs
-        for x in range(1,int(numberOfConcs)+1):
-            
-                conc1 = str(idealSheet.cell(x,5).value)
-
-                # Read in all data for concentration
-                rawSignal = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
+                # Isolate first run of concentration used to normalize
+                rawSignal = pd.read_excel(fileName, sheet_name=normalConc, engine='openpyxl')
                 rawSignal = rawSignal.dropna(how='all')
+                rawSignal = rawSignal.iloc[:,:2]
 
                 time = rawSignal['raw time']
-                numberOfRuns = len(rawSignal.columns)
+                sig = rawSignal[rawSignal.columns[1]]
+                colName = str(rawSignal.columns[1])
 
-                for run in range(1, int(numberOfRuns)):
+                # Average the background signals for first 5 secs, subtract from all signals
+                background = sig[time < injectTime].mean()
+                rawSignal.iloc[:,1] = rawSignal.iloc[:,1].sub(background)
 
-                        # Skip normalization concentration run 1
-                        if conc1.partition(" ")[0] != "%s" % normalConc or run != 1:
+                # Multiply raw signal by Sp
+                rawSignal.iloc[:,1] = rawSignal.iloc[:,1].mul(simulatedSigs.iloc[:,1])
+
+                # Normalize and remove negative signals
+                rawSignal.iloc[:,1] = rawSignal.iloc[:,1].mul(1)
+                rawSignal.loc[(rawSignal[colName] < 0), colName] = 0
+                normArea = rawSignal.iloc[:,1].sum()
+
+                # Add concentration to dictionary
+                d[normalConc]= rawSignal
                         
-                                sig = rawSignal[rawSignal.columns[run]]
 
-                                # Average the background signals for frist 5 secs, subtract from all signals
-                                background = sig[time < injectTime].mean()
-                                sig = sig.sub(background)
+                # Apply Sp and normalization to all other concentrations and runs
+                for x in range(1,int(numberOfConcs)+1):
+                    
+                        conc1 = str(idealSheet.cell(x,5).value)
 
-                                # Multiply raw signal by Sp
-                                sig = sig.mul(simulatedSigs.iloc[:,1])
+                        # Read in all data for concentration
+                        rawSignal = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
+                        rawSignal = rawSignal.dropna(how='all')
 
-                                # Normalize
-                                sigArea = sig.sum()
-                                sig = sig.mul(normArea)
-                                sig = sig.div(sigArea)
-                                sig[sig < 0] = 0
+                        time = rawSignal['raw time']
+                        numberOfRuns = len(rawSignal.columns)
 
-                                # Add concentration to dictionary or append run to exisiting entry
-                                if run == 1:
-                                        sig = pd.DataFrame(sig, columns=[rawSignal.columns[run]])
-                                        sig.insert(0, "raw time", time)
-                                        d[conc1]= sig
+                        for run in range(1, int(numberOfRuns)):
 
-                                else:
-                                        d[conc1].insert(len(d[conc1].columns), rawSignal.columns[run], sig)
-        
+                                # Skip normalization concentration run 1
+                                if conc1.partition(" ")[0] != "%s" % normalConc or run != 1:
+                                
+                                        sig = rawSignal[rawSignal.columns[run]]
 
-        writer = pd.ExcelWriter(fileName, engine='openpyxl')
-        writer.book = inputBook
+                                        # Average the background signals for frist 5 secs, subtract from all signals
+                                        background = sig[time < injectTime].mean()
+                                        sig = sig.sub(background)
 
-        writer.sheets = dict((ws.title, ws) for ws in inputBook.worksheets)
+                                        # Multiply raw signal by Sp
+                                        sig = sig.mul(simulatedSigs.iloc[:,1])
 
-        for y in d.keys():
-                d[y].to_excel(writer, sheet_name = y, index=False)
+                                        # Normalize
+                                        sigArea = sig.sum()
+                                        sig = sig.mul(normArea)
+                                        sig = sig.div(sigArea)
+                                        sig[sig < 0] = 0
 
-        simulatedSigs.to_excel(writer, sheet_name = 'P_simulated', index=False)
+                                        # Add concentration to dictionary or append run to exisiting entry
+                                        if run == 1:
+                                                sig = pd.DataFrame(sig, columns=[rawSignal.columns[run]])
+                                                sig.insert(0, "raw time", time)
+                                                d[conc1]= sig
 
-        idealSheet["B13"] = "Compensated"
+                                        else:
+                                                d[conc1].insert(len(d[conc1].columns), rawSignal.columns[run], sig)
+                
 
-        writer.save()
-        writer.close()
-        inputBook.save(fileName)
-        
+                writer = pd.ExcelWriter(fileName, engine='openpyxl')
+                writer.book = inputBook
+
+                writer.sheets = dict((ws.title, ws) for ws in inputBook.worksheets)
+
+                for y in d.keys():
+                        d[y].to_excel(writer, sheet_name = y, index=False)
+
+                simulatedSigs.to_excel(writer, sheet_name = 'P_simulated', index=False)
+
+                idealSheet["B13"] = "Compensated"
+
+                writer.save()
+                writer.close()
+                inputBook.save(fileName)
 
 
-### Analyze data in working file, add outputs and generate graph subfolder of pngs
+
 
 def dataanalysis(fileName):
         
@@ -530,7 +932,7 @@ def dataanalysis(fileName):
         # Confirm Inputs sheet with correct formatting before preceding
         if "Inputs" in inputBook.sheetnames:                                            
             idealSheet = inputBook["Inputs"]
-            percentage = int(idealSheet.cell(15,2).value)/100
+            percentage = float(idealSheet.cell(15,2).value)/100
             numberOfConcs = int(idealSheet.cell(10,2).value)
             injectionTime = float(idealSheet.cell(3,2).value)
             ligandConc = float(idealSheet.cell(11,2).value)
@@ -540,7 +942,7 @@ def dataanalysis(fileName):
             peakDet = str(idealSheet.cell(16,2).value)
 
             
-            subdirect = "%s/%s_graphs_%s" %(os.path.dirname(fileName),proteinName, date.today())
+            subdirect = "%s_graphs" % os.path.splitext(fileName)[0]
             if os.path.exists(subdirect)== False:
                     os.mkdir(subdirect)
                     
@@ -571,9 +973,9 @@ def dataanalysis(fileName):
         # If programmatic determination of peak use first run at specified concentration to calculate peak time and time window
         if peakDet == "P":
                 windowCalcConc = float(idealSheet.cell(18,2).value)
-                windowCalcConc = "%s %s" % (windowCalcConc, idealSheet.cell(1,5).value.partition(" ")[2])
+                windowCalcConcS = "%s %s" % (windowCalcConc, idealSheet.cell(1,5).value.partition(" ")[2])
 
-                data = pd.read_excel(fileName, sheet_name=windowCalcConc, engine='openpyxl')
+                data = pd.read_excel(fileName, sheet_name=windowCalcConcS, engine='openpyxl')
                 data = data.dropna(how='all')
                 xvalues = data['raw time']
                 yvalues = data.iloc[:,1]
@@ -582,18 +984,22 @@ def dataanalysis(fileName):
                 peakIndex = yvalues[yvalues == peakSignal].index
                 peakTime = xvalues[peakIndex]
 
-        # Determine maximum signal value (used to set graph parameters)
-        maxSig = 0 
+        # Determine absolute max signal value and max number of runs (used to set graph parameters)
+        maxSig = 0
+        maxRuns = 0
         for x in range(1,int(numberOfConcs)+1):         
                 conc1 = idealSheet.cell(x,5).value
                 data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
                 data = data.dropna(how='all')
                 data = data.iloc[:,1:]
+                currentMaxRuns = len(data.columns)
                 colMax = data.max()
                 currentMax = colMax.max()
 
                 if currentMax > maxSig:
                         maxSig = currentMax
+                if currentMaxRuns > maxRuns:
+                    maxRuns = currentMaxRuns
 
                 
         ## Part 4 - Calculating signal information for each concentration and generating separagram graphs
@@ -608,7 +1014,7 @@ def dataanalysis(fileName):
             data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
             data = data.dropna(how='all')
             numberOfRuns = len(data.columns)
-            
+            len(data.columns)-1
 
             # Calculate background signals for each run
             for col in range(1, numberOfRuns):
@@ -626,10 +1032,7 @@ def dataanalysis(fileName):
 
 
                 # If manual determination, extract the manually set peak time for given concentration
-                if peakDet == "M":
-                    if x==1:
-                            peakSignal = max(yvalues[xvalues>=injectionTime])
-                               
+                if peakDet == "M":   
                     manualTimes = idealSheet.cell(17,2).value.split(",")
                     peakIndex = xvalues.searchsorted(float(manualTimes[x-1]), side='left')
                     peakTime = xvalues[peakIndex-1]
@@ -645,6 +1048,7 @@ def dataanalysis(fileName):
 
                 # Graph the signal for each run and with time window indicated
                 plt.plot(xvalues, yvalues)
+                
 
             # Appending a figure with all experimental runs for concentration
             plt.xlabel('Propagation time (s)', fontweight='bold')
@@ -655,23 +1059,38 @@ def dataanalysis(fileName):
             plt.text(minTime,maxSig*1.05, r"[%s]$\mathbf{_0}$ = %s" % (proteinName, conc1), fontweight='bold')
             plt.vlines(windowLow, 0, maxSig*1.05, linestyles='dashed',color='gray')
             plt.vlines(windowHigh, 0, maxSig*1.05, linestyles='dashed',color='gray')
-            plt.savefig("%s/%s.png" % (subdirect, conc1))    # save separagram graphs
+            plt.savefig("%s/%s.png" % (subdirect, conc1))
             graphs.append(plt.figure())
             plt.clf()
 
-
+            
             # Calculating average signal for each concentration, stdev and relative stdev        
-            avgSigConc = np.average(avgSigsRun)
-            avgSigConc_stdev = np.std(avgSigsRun)
-            avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
+            if peakDet == "P" and float(conc1.partition(" ")[0]) >= windowCalcConc:
+                avgSigConc = np.average(avgSigsRun)
+                avgSigConc_stdev = np.std(avgSigsRun)
+                avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
 
-                    
-            concentration.append(conc1)
-            signal.append(avgSigConc)    
-            stddev.append(avgSigConc_stdev)
-            relstddev.append(avgSigConc_relstdev)
+                        
+                concentration.append(conc1)
+                signal.append(avgSigConc)    
+                stddev.append(avgSigConc_stdev)
+                relstddev.append(avgSigConc_relstdev)
 
             
+        # Generate legend for run colors
+        #fig = plt.figure()
+        #figLeg = plt.figure(figsize=(2, 1.25))
+        #labels = []
+        #lines = []
+        #for r in range (1,maxRuns):
+                #ax = fig.add_subplot(111)
+                #lines.append(ax.plot([1],[2]))
+                #labels.append('Run %s' % r)
+                #lines.append((r, sin(
+        #plt.legend(labels, loc='center')
+        #plt.savefig("%s/lengendM.png" % subdirect)
+        #plt.clf()
+
         # Graphing separagrams for the first run for every concentration
         for x in range(1,int(numberOfConcs),2):         
             conc1 = idealSheet.cell(x,5).value
@@ -680,7 +1099,7 @@ def dataanalysis(fileName):
             data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
             data = data.dropna(how='all')
             xvalues = data['raw time']
-            yvalues = data.iloc[:, 2]
+            yvalues = data.iloc[:, 1]
 
             p = plt.plot(xvalues, yvalues, label= '%s' % conc1)   
 
@@ -703,13 +1122,13 @@ def dataanalysis(fileName):
         plt.clf()
 
 
-        ## Part 5 - Calculate R values and standard deviation of R values for each concentration
+        ## Part 5 - Calculate R values and standard deviation of R values for each concentration 
         LowProt_sig = signal[0]
-        HighProt_sig = signal[numberOfConcs-1]
+        HighProt_sig = signal[len(concentration)-1]
         LowProt_stddev = stddev[0]
-        HighProt_stdDev = stddev[numberOfConcs-1]
+        HighProt_stdDev = stddev[len(concentration)-1]
 
-        for y in range(0, numberOfConcs):
+        for y in range(0, len(concentration)-1):
                 conc2 = idealSheet.cell(y+1,5).value
                 avgSigConc_R = (signal[y] - HighProt_sig)/ (LowProt_sig - HighProt_sig) 
                 Rvalue.append(avgSigConc_R)
@@ -721,7 +1140,7 @@ def dataanalysis(fileName):
         ## Part 6 - Plotting the binding isotherm R vs P[0] with curve of best fit
         # Convert concentration strings to floats
         concs = []
-        for element in range(0, len(concentration)):
+        for element in range(0, len(concentration)-1):
                 num = concentration[element].partition(" ")[0]
                 concs.append(float(num))
         unit = concentration[0].partition(" ")[2]
@@ -800,7 +1219,8 @@ def dataanalysis(fileName):
 
         return subdirect
 
-### Generate PDF report summary
+
+
 
 def report (workingFile, graphFolder):
     # Read in data tables from working file
@@ -867,15 +1287,20 @@ def report (workingFile, graphFolder):
     pdf.add_page()
     pos = 0.2
     graphY = pdf.get_y()
+    count = 0
 
     for img in images:
         if img.endswith('M.png'):
+            count +=1
+            if count/16 == 1:
+                pdf.add_page()
+                count = 0
+                
             if pos < 3:
                 pdf.set_y(graphY)
                 pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
                 pdf.ln(0)
                 pos +=1
-                
                 
             elif pos == 3.2:
                 pos = 0.2
@@ -888,6 +1313,11 @@ def report (workingFile, graphFolder):
     pdfNAME = '%s/%s_%s' % (currentFolder, proteinName, date.today())
     pdf.output(pdfNAME)
     webbrowser.open_new('file://%s' % pdfNAME)
+
+
+
+
+
 
 
 ######### EVENT LOOP ##############
@@ -906,7 +1336,7 @@ while True:
         window['normConc'].update(visible=False)
         window['normConc_val'].update(visible=False)
 
-    # If manual peak determination, enter peaks    
+    # If manual peak determination, enter peak times
     if event == 'peakM':
         window['manPeaks'].update(visible=True)
         window['manPeaks_val'].update(visible=True)
@@ -920,59 +1350,82 @@ while True:
         window['progPeak'].update(visible=True)
         window['progPeak_val'].update(visible=True)
 
+# Validate user input file path
     if event == 'validate':
-        filePath = str(values['filePath_val'])
         window['out'].update(visible=False)
         window['report'].update(visible=False)
 
+        # Confirm input is a string
+        check = valStr(values['filePath_val'])
+        if check[0] == True:
+            filePath = check[1]
+        elif check[0] == False:
+            sg.popup(check[1])
+
+        # Verify if input path exists
         if not os.path.exists(filePath):
-            window['fluidParam'].update(visible=False)
-            window['concFrame'].update(visible=False)
-            window['analysisParam'].update(visible=False)
-            window['rawData'].update(visible=False)
-            window['work'].update(visible=False)
-            window['invalid'].update(visible=True)
+            window['in'].update(visible=False)
             window['calculate'].update(disabled=True)
 
+            window['invalid'].update(visible=True)
+            window['work'].update(visible=False)
+            window['rawData'].update(visible=False)
+            
+        # Verify if input path is Excel workbook or directory
         elif os.path.exists(filePath):
             if os.path.isfile(filePath) and filePath.endswith(".xlsx"):
-                workingFile = filePath
-                window['fluidParam'].update(visible=False)
-                window['concFrame'].update(visible=False)
-                window['analysisParam'].update(visible=False)
-                window['rawData'].update(visible=False)
+                window['in'].update(visible=False)
+                window['calculate'].update(disabled=False)
+
                 window['invalid'].update(visible=False)
                 window['work'].update(visible=True)
-                window['calculate'].update(disabled=False)
+                window['rawData'].update(visible=False)
+                pathType = "workingFile"
                 
-
             elif os.path.isdir(filePath):
-                window['fluidParam'].update(visible=True)
-                window['concFrame'].update(visible=True)
-                window['analysisParam'].update(visible=True)
-                window['rawData'].update(visible=True)
+                window['in'].update(visible=True)
+                window['calculate'].update(disabled=False)
+
                 window['invalid'].update(visible=False)
                 window['work'].update(visible=False)
-                window['calculate'].update(disabled=False)
+                window['rawData'].update(visible=True)
+                pathType = "directory"
    
-    
+# Validate user input and calculate Kd     
     if event == 'calculate':
-        
+
         window['out'].update(visible=False)
 
-        filePath = str(values['filePath_val'])
+        # If working file entered, validate contents
+        if pathType == "workingFile":
+                workingFile = str(values['filePath_val'])
+                #### Validate workbook & sheets & values
+                fileResults = validateExcel(workingFile)
 
-        if os.path.exists(filePath):
-            if os.path.isfile(filePath) and filePath.endswith(".xlsx"):
-                workingFile = filePath
+                if fileResults[0]==False:
+                    errorMessage = genFileErrorMessage(fileResults[1])
+                    sg.popup(errorMessage)
+
+                elif fileResults[0]:
+                    sg.popup('Calculating Kd')
+                
                 data = pd.read_excel(workingFile, engine='openpyxl')
                 inputBook = load_workbook(workingFile, data_only=True)         
                 idealSheet = inputBook["Inputs"]
                 compYN = str(idealSheet.cell(13,2).value)
                 
-            # If file path is directory read in user inputs
-            elif os.path.isdir(filePath):
-                
+        # If file path is directory validate required user inputs 
+        elif pathType == "directory":
+            filePath = str(values['filePath_val'])
+            reqResult = confirmRequired(values)
+
+            if reqResult[0]==False or reqResult[2]==False:
+                errorMessage = genErrorMessage(reqResult[1], reqResult[3])
+                sg.popup(errorMessage)
+
+            elif reqResult[0] and reqResult[2]:
+                sg.popup('Calculating Kd')
+
                 # Read in user inputs for fluidics parameters
                 propFlow = values['propFlow_val']
                 injectFlow = values['injectFlow_val']
@@ -1011,42 +1464,72 @@ while True:
                     manualPeaks = None
                     peakConc = float(values['progPeak_val'])
 
-                workingFile = workingfileprep(filePath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
+            
+                # Check for existing Excel files with same name
+                suggName = "%s/%s_%s.xlsx" % (filePath, proteinName, date.today())
+                exists = checkForOverwriting(suggName)
+
+                if exists[0] == True:
+                    if sg.popup_yes_no('A file with the file path %s already exists in this directory. \n \n Would you like to overwrite this file?' % os.path.basename(suggName)) =='NO':
+                        workingFilePath = exists[1]
+                        
+                    else:
+                        os.remove(suggName)
+                        workingFilePath = (suggName)
+                        
+                    
+                elif exists[0] == False:
+                    workingFilePath = suggName
+        
+                # Validate contents of raw data directory
+                checkDirect = validateDirectoryContents(filePath, compYN, normalConc, peakDet, peakConc)
+
+                if checkDirect[0] == False:
+                    errorMessage = genErrorMessageDirect(checkDirect[1])
+                    sg.popup(errorMessage)
+                    window.close()
+                    break
+                    
+                # Prepare working file
+                workingFile = workingfileprep(filePath, workingFilePath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
                                               injectLength, injectDiam, proteinName, ligandName, ligandConc, dataType,
                                               compYN, normalConc, windowWidth, peakDet, manualPeaks, peakConc)
 
 
-
-            if compYN == "Y" :
-                compensate(workingFile)
+        # Unmask signals with compensation procedure if indicated
+        if compYN == "Y" :
+            compensate(workingFile)
                 
 
-            graphPath = dataanalysis(workingFile)
-            images = natsorted(glob.glob('%s/*.png' % graphPath))
-            load_image(images[0],window)
+        # Analyze signals, update Excel working file and generate subfolder with separagrams and binding isotherm
+        graphPath = dataanalysis(workingFile)
+        images = natsorted(glob.glob('%s/*.png' % graphPath))
+        load_image(images[0],window)
             
-            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
-            df = df.dropna(how='any')
-            headers = df.iloc[0].values.tolist()
-            data = df.iloc[1:].values.tolist()
-            window['summary'].update(values=data, num_rows=min(10,len(data)))
+        # Read in summary and Kd information from working file to display in GUI output
+        df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
+        df = df.dropna(how='any')
+        headers = df.iloc[0].values.tolist()
+        data = df.iloc[1:].values.tolist()
+        window['summary'].update(values=data, num_rows=min(10,len(data)))
 
-            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
-            df = df.dropna(how='any')
-            data = df.values.tolist()
-            window['Kd'].update(values=data, num_rows=3)
+        df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
+        df = df.dropna(how='any')
+        data = df.values.tolist()
+        window['Kd'].update(values=data, num_rows=3)
             
-            window['out'].update(visible=True)
-            window['report'].update(visible=True)
+        # Show output column and report
+        window['out'].update(visible=True)
+        window['report'].update(visible=True)
 
         
+    # Buttons for image viewer in GUI
     if event == 'fwd':
         if location == len(images)-1:
             location=0
         else:
             location +=1
         load_image(images[location], window)
-    
 
     if event == 'back':
         if location == 0:
@@ -1055,8 +1538,8 @@ while True:
              location -=1
         load_image(images[location], window)
 
+    # Functionality for report button to generate, save and open PDF report
     if event == 'report':
         report(workingFile, graphPath) 
 
-    
 window.close()
