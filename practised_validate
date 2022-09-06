@@ -1,0 +1,451 @@
+# Validation of key practised parameters
+
+import argparse                                   
+import pathlib
+import sys
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from openpyxl import load_workbook
+from openpyxl import Workbook
+from openpyxl.utils import FORMULAE
+from openpyxl.utils import get_column_letter, column_index_from_string
+import math
+from scipy.optimize import curve_fit
+from datetime import date
+import os
+
+
+# Subfunctions for validating GUI user inputs 
+def valFloat (x):       # percentage, injection time, ligandConc, windowConc
+    try:
+        float(x)
+        return [True, float(x)]
+    except ValueError:
+        return [False, 'Expected a numerical unitless value, please try again']
+
+def valStr (x):    # non-mandatory user inputs, protein name 
+    try:
+        str(x)
+        return [True, str(x)]
+    except ValueError:
+        return [False, 'Expected a string, please try again']
+
+def valManualTimes (x):
+    valStr(x)
+    try:
+        x = x.split(",")
+        for time in x:
+            float(x)
+        return [True, x]
+    except:
+        return [False, 'Expected list of numerical times separated by commas, please try again']
+
+### Validating required fields of GUI user inputs (see above for associated sub-functions)      
+def confirmRequired (values):
+    is_input = True
+    values_missing = []
+    is_valid = True
+    values_invalid = []
+
+    if len(values['injectTime_val'])==0:
+        values_missing.append('Injection time')
+        is_input = False
+    elif len(values['injectTime_val'])>0:
+        check = valFloat(values['injectTime_val'])
+        if check[0] == False:
+            values_invalid.append('Injection time - %s' % check[1])
+            is_valid = False
+        if check[0] == True and check[1]<=0: 
+            values_invalid.append('Injection time - Expected a numerical value greater than 0')
+            is_valid = False
+
+    if len(values['protName_val'])==0:
+        values_missing.append('Protein name')
+        is_input = False
+    elif len(values['protName_val'])>0:
+        check = valStr(values['protName_val'])
+        if check[0] == False:
+            values_invalid.append('Protein name - %s' % check[1])
+            is_valid = False
+
+    if len(values['ligConc_val'])==0:
+        values_missing.append(u'Initial ligand concentration [L]\u2080')
+        is_input = False
+    elif len(values['ligConc_val'])>0:
+        check = valFloat(values['ligConc_val'])
+        if check[0] == False:
+            values_invalid.append(u'Initial ligand concentration [L]\u2080 - %s' % check[1])
+            is_valid = False
+        if check[0] == True and check[1]<=0:
+            values_invalid.append(u'Initial ligand concentration [L]\u2080 - Expected a numerical value greater than 0')
+            is_valid = False
+
+    if not values['dataF'] and not values['dataMS']:
+        values_missing.append('Type of data')
+        is_input = False
+
+    if not values['compYes'] and not values['compNo']:
+        values_missing.append('Compensation procedure')
+        is_input = False
+
+    if values['compYes'] and len(values['normConc_val'])==0:
+        values_missing.append(u'[P]\u2080 reference for normalization')
+        is_input = False
+    elif values['compYes'] and len(values['normConc_val'])>0:
+        check = valFloat(values['normConc_val'])
+        if check[0] == False:
+            values_invalid.append(u'[P]\u2080 reference for normalization - %s' % check[1])
+            is_valid = False
+
+    if len(values['window_val'])==0:
+        values_missing.append('Window width')
+        is_input = False
+    elif len(values['window_val'])>0:
+        check = valFloat(values['window_val'])
+        if check[0] == False:
+            values_invalid.append('Window width')
+            is_valid = False
+        if check[0] == True and check[1]<0:
+            values_invalid.append('Window width - Expected a numerical value greater or equal to 0')
+            is_valid = False
+
+    if not values['peakM'] and not values['peakP']:
+        values_missing.append('Determination of peak')
+        is_input = False
+
+    if  values['peakM'] and len(values['manPeaks_val'])==0:
+        values_missing.append('Peaks for concentrations')
+        is_input = False
+    elif values['peakM'] and len(values['manPeaks_val'])>0:
+        check = valManualTimes(values['manPeaks_val'])
+        if check[0] == False:
+            values_invalid.append('Peaks for concentrations - %s' % check[1])
+            is_valid = False
+
+    if  values['peakP'] and len(values['progPeak_val'])==0:
+        values_missing.append(u'[P]\u2080 used to determine peak')
+        is_input = False
+    elif values['peakP'] and len(values['progPeak_val'])>0:
+        check = valFloat(values['progPeak_val'])
+        if check[0] == False:
+            values_invalid.append(u'[P]\u2080 used to determine peak - %s' % check[1])
+            is_valid = False
+
+    result = [is_input, values_missing, is_valid, values_invalid]
+    return result
+
+# Generate error message for validation of GUI user inputs
+def genErrorMessage (values_missing, values_invalid):
+    errorMessage = ''
+    for val in values_missing:
+        errorMessage += ('\nMissing' + ": " + val)
+    for val in values_invalid:
+        errorMessage += ('\nInvalid' + ": " + val)
+    return errorMessage
+
+###
+def valConc (x):
+    valStr(x)
+    try:
+        molar = x.find("M")
+        prefix = x[molar-1]
+        y = float(x.partition(prefix)[0])
+        return [True, '%s %sM' % (y, prefix)]
+    except:
+        return [False, 'Expected file name to start with concentration with units, please try again']
+
+def validateDirectoryContents (filePath, compYN, normalConc, peakDet, peakConc):
+    fileErrors=[]
+    filesValid =True
+    simData = False
+    rawData = False
+    normConc = False
+    pPeak = False
+    suggName = ''
+    
+    if len(os.listdir(filePath)) == 0:
+        fileErrors.append('Error: Given file directory %s is empty, please try again' % (filePath))
+        filesValid = False
+        
+    for file in os.listdir(filePath):
+        if not file.startswith('simulated') and os.path.splitext(file)[1] in (".txt", ".asc", ".dat") and not 'READ' in os.path.splitext(file)[0]:
+            rawData = True
+            preCheck = valConc(file)
+            if preCheck[0] == False:
+                fileErrors.append('Error: File name %s does not follow prefix conventions - %s' % (file, preCheck[1]))
+                filesValid = False
+            if preCheck[0] == True:
+                if suggName == '':
+                    suggName = "%s/%s.xlsx" % (filePath, os.path.basename(filePath))
+                molar = file.find("M")
+                prefix = file[molar-1]
+                if peakDet== "P" and float(file.partition(prefix)[0]) == peakConc:
+                    pPeak = True
+                if compYN =="Y" and type(normalConc)==float:
+                    if float(file.partition(prefix)[0]) == normalConc:
+                        normConc = True
+            
+            endCheck = os.path.splitext(file)[0]
+            if not endCheck[-1].isnumeric:
+                fileErrors.append('Error: File name %s does not end with run number,  please try again' % (file))
+                filesValid = False
+                              
+        if file.startswith('simulated') and os.path.splitext(file)[1] == '.txt':
+            simData = True
+
+    if compYN =="Y" and simData==False:
+            fileErrors.append('Error: No simulated protein profile .txt file beginning with simulated found in file directory %s , please try again' % (filePath))
+            filesValid = False
+    if compYN =="Y" and normConc==False:
+            fileErrors.append(u'Error: No files found for indicated [P]\u2080 = %s used for normalization' % (normalConc))
+            filesValid = False
+        
+    if rawData == False:
+        fileErrors.append('Error: No .asc, .txt or .dat raw data files found in %s' % (filePath))
+        filesValid = False
+
+    if peakDet=="P" and pPeak == False:
+        fileErrors.append(u'Error: No files found for indicated [P]\u2080 = %s used to programmaticlly determine peak' % (peakConc))
+        filesValid = False
+        
+    return [filesValid, fileErrors, suggName]
+                
+# Generate error message for validating directory to raw data files (& simulated protein profile)
+def genErrorMessageDirect (fileErrors):
+    errorMessage = ''
+    for val in fileErrors:
+        errorMessage += ('\n'+ val)
+    return errorMessage
+
+
+### Check if file with same name exists, check if user wants to overwrite
+def checkForOverwriting (suggestedFilePath):
+    exists = False
+    exists_Name = ''
+    if os.path.exists(suggestedFilePath)== False:
+        return [exists, suggestedFilePath]
+
+    elif os.path.exists(suggestedFilePath)== True:
+        exists = True
+        exists_Name = suggestedFilePath
+        for duplicate in range(2,9):
+            withoutExt = os.path.splitext(suggestedFilePath)[0]
+            temp = "%s_%d.xlsx" % (withoutExt, duplicate)
+
+            if os.path.exists(temp)== False:
+                suggestedFilePath=temp
+                return [exists, suggestedFilePath]
+                break
+
+
+### Subfunctions for validating Excel workbook
+def valDataType (x):
+    valStr(x)
+    if x == "F" or x == 'f' or "F" in x or 'f' in x:
+        return [True, "F"]
+    elif x == "MS" or x == 'ms' or "MS" in x or 'ms' in x:
+        return [True, "MS"]
+    else:
+        return [False, 'Expected F or MS, please try again']
+
+
+def valComp (x):
+    valStr(x)
+    if x == "Y" or x == 'y' or "Y" in x or 'y' in x:
+        return [True, "Y"]
+    elif x == "N" or x == 'n' or "N" in x or ('n' in x and 'en' not in x):
+        return [True, "N"]
+    elif x == "Compensated" or x == "compensated" or "ompensate" in x:
+        return [True, "Compensated"]
+    else:
+        return [False, 'Expected Y, N or Compensated, please try again']
+    
+
+def valPeakDetermination (x):
+    valStr(x)
+    if x == "P" or x == 'p' or "P" in x or 'p' in x:
+        return [True, "P"]
+    elif x == "M" or x == 'm' or "M" in x or 'm' in x:
+        return [True, "M"]
+    else:
+        return [False, 'Expected P or M, please try again']
+    
+
+def valManualTimes (x, numConcs, injectTime):
+    valStr(x)
+    try:
+        times_valid = True
+        y = x.split(",")
+        if len(y) != numConcs:
+            return [False, 'Error: Manually determined peaks - Expected %s times,  %s inputted' % (numConcs, len(y))]
+        for time in y:
+            if time < injectTime:
+                times_valid = False
+                return [False, 'Error: Manually determined peaks - Expected times greater than injection time %s s' % injectTime]
+                break
+        if len(y)==numConcs and times_valid==True:
+                return [True, str(x)]
+    except:
+        return [False, 'Expected list of times separated by commas, please try again']
+    
+
+def valConc (x):
+    valStr(x)
+    try:
+        molar = x.find("M")
+        prefix = x[molar-1]
+        y = float(x.partition(prefix)[0])
+        return [True, '%s %sM' % (y, prefix)]
+    except:
+        return [False, 'Expected concentration with units, please try again']
+    
+### Validating an Excel workbook for expected sheets and mandatory fields (see above for associated sub-functions)
+def validateExcel (filePath):
+    
+    # Validate file path is for an Excel workbook
+    inputErrors = []
+    is_valid = True
+    if not os.path.exists(filePath):
+        inputErrors.append('Error: Path %s does not exist' % filePath)
+        is_valid=False
+        
+    if not os.path.isfile(filePath):
+         inputErrors.append('Error: %s is not a valid file path' % filePath)
+         is_valid=False
+        
+    if not filePath.endswith(".xlsx"):
+        inputErrors.append('Error: %s is not a valid Excel file' % filePath)
+        is_valid=False
+         
+    if os.path.isfile(filePath) and filePath.endswith(".xlsx"):
+        data = pd.read_excel(filePath, engine='openpyxl')
+        inputBook = load_workbook(filePath, data_only=True)
+        sheets = inputBook.sheetnames
+
+        # TODO: Confirm Excel workbook is not open, confirm permissions for reading/writing Excel workbook
+
+        # Verify there is a sheet named Inputs
+        if 'Inputs' not in sheets:
+            return "Error: No sheet named Inputs found in Excel workbook %s" % filePath
+
+        # If Inputs sheet exists, confirm all mandatory inputs
+        elif 'Inputs' in sheets:
+            idealSheet = inputBook["Inputs"]
+            
+            windowCheck = valFloat(idealSheet.cell(15,2).value)
+            if windowCheck[0]!=True:
+                inputErrors.append('Error: Window width - %s' % windowCheck[1])
+                is_valid = False
+
+            numConcCheck = valFloat(idealSheet.cell(10,2).value)
+            if numConcCheck[0]!=True:
+                inputErrors.append('Error: Number of Concentrations - %s' % numConcCheck[1])
+                is_valid = False
+            
+            injectTimeCheck = valFloat(idealSheet.cell(3,2).value)
+            if injectTimeCheck[0]!=True:
+                inputErrors.append('Error: Injection time - %s' % injectTimeCheck[1])
+                is_valid = False
+                            
+            ligandConcCheck = valFloat(idealSheet.cell(11,2).value)
+            if ligandConcCheck[0]!=True:
+                inputErrors.append('Error: Initial Ligand concentration - %s' % ligandConcCheck[1])
+                is_valid = False
+                                   
+            proteinNameCheck = valStr(idealSheet.cell(8,2).value)
+            if proteinNameCheck[0]!=True:
+                inputErrors.append('Error: Protein name - %s' % proteinNameCheck[1])
+                is_valid = False
+                                   
+            # Validate data type
+            dataTypeCheck = valStr(idealSheet.cell(12,2).value)
+            if dataTypeCheck[0]!=True:
+                inputErrors.append('Error: Data Type - %s' % dataTypeCheck[1])
+                is_valid = False
+            elif dataTypeCheck[0]==True:
+                secondCheck = valDataType(dataTypeCheck[1])
+                if secondCheck[0] == True:
+                    idealSheet['B12'] = secondCheck[1]
+                elif secondCheck[0] == False:
+                    inputErrors.append('Error: Data Type - %s' % secondCheck[1])
+                    is_valid = False
+
+            # Validate compensation specification
+            compYNCheck = valStr(idealSheet.cell(13,2).value)
+            if compYNCheck[0]!=True:
+                inputErrors.append('Error: Compensation procedure - %s' % compYNCheck[1])
+                is_valid = False
+            elif compYNCheck[0]==True:
+                secondCheck = valComp(compYNCheck[1])
+                if secondCheck[0] == True:
+                    idealSheet['B13'] = secondCheck[1]
+
+                    if secondCheck[1] == "Y":
+                        normalConcCheck = valFloat(idealSheet.cell(14,2).value)
+                        if normalConcCheck[0] == False:
+                            inputErrors.append('Error: Compensation procedure - %s' % secondCheck[1])
+                            is_valid = False
+                            
+                        if 'P_simulated' not in sheets:
+                            inputErrors.append("Error: No sheet named P_simulated found in Excel workbook %s" % filePath)
+                            is_valid = False          
+                            
+                elif secondCheck[0] == False:
+                    inputErrors.append('Error: Compensation procedure - %s' % secondCheck[1])
+                    is_valid = False
+
+            # Validate peak determination method and dependent manual or programmatic times
+            peakDetCheck = valStr(idealSheet.cell(16,2).value)
+            if peakDetCheck[0]!=True:
+                inputErrors.append('Error: Determination of peak - %s' % dataTypeCheck[1])
+                is_valid = False
+            elif peakDetCheck[0]==True:
+                secondCheck = valPeakDetermination(peakDetCheck[1])
+                if secondCheck[0] == False:
+                    inputErrors.append('Error: Determination of peak - %s' % secondCheck[1])
+                    is_valid = False
+                elif secondCheck[0] == True:
+                    idealSheet['B16'] = secondCheck[1]
+
+                    if secondCheck[1] == "M":
+                        if numConcCheck[0]==True and injectTimeCheck[0]==True:
+                            manualTimesCheck = valManualTimes(idealSheet.cell(17,2).value, numConcCheck[1], injectTimeCheck[1])
+                            if manualTimesCheck[0] == False:
+                                inputErrors.append('Error: Manually determined peaks - %s' % secondCheck[1])
+                                is_valid = False
+                                
+                    elif secondCheck[1] == "P":
+                        pPeakCheck = valFloat(idealSheet.cell(18,2).value)
+                        if pPeakCheck[0]==False:
+                            inputErrors.append(u'Error: [P]\u2080 used to determine peak - %s' % pPeakCheck[1])
+                            is_valid = False
+
+            if numConcCheck[0]==True:
+                for  x in range(1,int(numConcCheck[1])+1):
+                    concCheck = valConc(idealSheet.cell(x,5).value)
+                    if concCheck[0]==False:
+                        inputErrors.append('Error: Listed concentrations - %s' % concCheck[1])
+                        is_valid = False
+                    elif concCheck[0]==True:
+                        idealSheet['%s5' % get_column_letter(x)] = secondCheck[1]
+                        if concCheck[1] not in sheets:
+                            inputErrors.append('Error: No sheet named %s found in Excel workbook %s' % (concCheck[1],filePath))
+                            is_valid = False
+                        
+                        elif concCheck[1] in sheets:
+                            df = pd.read_excel(filePath, sheet_name=concCheck[1], engine='openpyxl')
+                            df = df.dropna(how='all')
+                
+                            if df.columns[0] != 'raw time':
+                                inputErrors.append('Error: No raw time column found in %s sheet of Excel workbook %s' % (concCheck[1],filePath))
+                                is_valid = False
+                                                          
+    return [is_valid, inputErrors]
+
+# Generate error message for validation of Excel workbook                                    
+def genFileErrorMessage(inputErrors):
+    errorMessage = ''
+    for val in inputErrors:
+        errorMessage += ('\n' + val)
+    return errorMessage
