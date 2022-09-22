@@ -1,4 +1,23 @@
-# Validation of key practised parameters
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# practised_validate.py validates key practised parameters passed from
+# practised.py
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse                                   
 import pathlib
@@ -234,8 +253,7 @@ def checkForOverwriting (suggestedFilePath):
             temp = "%s_%d.xlsx" % (withoutExt, duplicate)
 
             if os.path.exists(temp)== False:
-                suggestedFilePath=temp
-                return [exists, suggestedFilePath]
+                return [exists, temp]
                 break
 
 
@@ -322,8 +340,6 @@ def validateExcel (filePath):
         data = pd.read_excel(filePath, engine='openpyxl')
         inputBook = load_workbook(filePath, data_only=True)
         sheets = inputBook.sheetnames
-
-        # TODO: Confirm Excel workbook is not open, confirm permissions for reading/writing Excel workbook
 
         # Verify there is a sheet named Inputs
         if 'Inputs' not in sheets:
