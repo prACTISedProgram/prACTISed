@@ -1,3 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# practised_compensation.py unmasks ACTIS experimental signals in an
+# Excel working file formatted for practised.py
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import argparse
 import pathlib
 import sys
@@ -11,6 +32,7 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 import math
 from scipy import integrate, interpolate
 from natsort import natsorted
+import PySimpleGUI as sg
 
 def compensate (fileName):
 
@@ -26,21 +48,30 @@ def compensate (fileName):
         unit = idealSheet.cell(1,5).value.partition(" ")[2]
         normalConc = "%s %s" % (normalConc, unit)
         compYN = str(idealSheet.cell(13,2).value)
-
-        if compYN == 'Y':
         
+        if compYN == 'Y':
                 # Get dimensionless simulated separagram of pure protein, S̃p, and interpolate signals
                 simulated = pd.read_excel(fileName, sheet_name='P_simulated', engine='openpyxl')
+                
 
                 # Interpolate signals from simulated protein profile
                 timeSim = simulated['raw time']
                 sigSim = simulated['signal']
                 interp = interpolate.splrep(timeSim, sigSim)
 
+                interest = timeSim[timeSim.between(0,60, inclusive='both')]
+                if (interest.diff() > 1).any() == True:
+                        sg.popup_ok('Warning: you may want to use a more refined mesh for the simulated protein profile', non_blocking=True)             
+
                 # Isolate interrpolated signals at for times in raw data files
                 rawData = pd.read_excel(fileName, sheet_name=normalConc, engine='openpyxl')
                 rawData = rawData.dropna(how='all')
                 rawTime = rawData['raw time']
+
+                if timeSim.iloc[-1] < rawTime.iloc[-1]:
+                        sg.popup_ok('prACTISed cancelled \n \nError: Simulated protein profile does not extend as long as experimental data times. \nPlease try again with a longer simulated protein profile file.')
+                        return False    
+                                
                 interpSigs = interpolate.splev(rawTime, interp, der=0)
 
                 # Normalize signals, remove negative values and generate data frame
@@ -75,11 +106,11 @@ def compensate (fileName):
 
                 # Add concentration to dictionary
                 d[normalConc]= rawSignal
-                        
+                                
 
                 # Apply Sp and normalization to all other concentrations and runs
                 for x in range(1,int(numberOfConcs)+1):
-                    
+                            
                         conc1 = str(idealSheet.cell(x,5).value)
 
                         # Read in all data for concentration
@@ -93,7 +124,7 @@ def compensate (fileName):
 
                                 # Skip normalization concentration run 1
                                 if conc1.partition(" ")[0] != "%s" % normalConc or run != 1:
-                                
+
                                         sig = rawSignal[rawSignal.columns[run]]
 
                                         # Average the background signals for frist 5 secs, subtract from all signals
@@ -117,7 +148,7 @@ def compensate (fileName):
 
                                         else:
                                                 d[conc1].insert(len(d[conc1].columns), rawSignal.columns[run], sig)
-                
+                        
 
                 writer = pd.ExcelWriter(fileName, engine='openpyxl')
                 writer.book = inputBook
