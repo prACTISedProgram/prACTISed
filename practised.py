@@ -1,7 +1,28 @@
-#20220725 JL    NOTE: Switched to PySimpleGUI, added data analysis and working file preparation as functions (compensation & report WIP)
-#20220809 JL    NOTE: Added compensation with interpolation from simulated, small adjustments to working file and graph formatting (TODO: report)
-#20220912 JL    NOTE: Added pdf report option to GUI (TODO: unicode for Chi character, open pdf)
-#20220918 JL    NOTE: Beginning of error trapping, minor refactoring, rearranging GUI, implicit R=[P]0 for programmatic peak determination (TODO: add .dat files to workingfileprep)
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# practised.py serves as the GUI for extracting ACTIS titration data
+# users specify experimental parameters and practised.py calls
+# assosciated modules to calculate Kd and return separagrams and
+# binding isotherm graph. See READ.ME for information on Excel working 
+# file preparation
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
 
 import PySimpleGUI as sg
 
@@ -125,6 +146,7 @@ layout = [
 window = sg.Window("prACTISed", layout, finalize=True, element_justification='c')
 
 
+
 ######### DEFINE FUNCTIONS ##############
 
 # Display image from file path - for GUI image viewer
@@ -214,39 +236,49 @@ while True:
         window['out'].update(visible=False)
         valid = False
 
+        another = [[sg.Text('Validating input fields...', key='loadText')],
+                   [sg.ProgressBar(10, orientation='h', size = (20,20), key = 'progressBar')]]
+        window2 = sg.Window('prACTISed progress', another, finalize=True)
+        if event == sg.WIN_CLOSED:
+            break
+
         # If working file entered, validate contents
         if pathType == "workingFile":
                 workingFile = str(values['filePath_val'])
 
                 # Validate workbook & sheets & values
+                window2['progressBar'].UpdateBar(1)
                 fileResults = validateExcel(workingFile)
 
                 if fileResults[0]==False:
                     errorMessage = genFileErrorMessage(fileResults[1])
                     sg.popup(errorMessage)
+                    window2.close()
 
                 elif fileResults[0]:
-                    sg.popup('Calculating Kd')
                     valid = True
-                
-                data = pd.read_excel(workingFile, engine='openpyxl')
-                inputBook = load_workbook(workingFile, data_only=True)         
-                idealSheet = inputBook["Inputs"]
-                compYN = str(idealSheet.cell(13,2).value)
+ 
+                    window2['loadText'].update('Reading input Excel file...')
+                    window2['progressBar'].UpdateBar(2)
+                    data = pd.read_excel(workingFile, engine='openpyxl')
+                    inputBook = load_workbook(workingFile, data_only=True)         
+                    idealSheet = inputBook["Inputs"]
+                    compYN = str(idealSheet.cell(13,2).value)
                 
         # If file path is directory validate required user inputs 
         elif pathType == "directory":
             filePath = str(values['filePath_val'])
+            window2['progressBar'].UpdateBar(1)
             reqResult = confirmRequired(values)
 
             if reqResult[0]==False or reqResult[2]==False:
                 errorMessage = genErrorMessage(reqResult[1], reqResult[3])
                 sg.popup(errorMessage)
+                window2.close()
 
             elif reqResult[0] and reqResult[2]:
-                sg.popup('Calculating Kd')
                 valid = True
-
+                
                 # Read in user inputs for fluidics parameters
                 propFlow = values['propFlow_val']
                 injectFlow = values['injectFlow_val']
@@ -286,8 +318,9 @@ while True:
                     peakConc = float(values['progPeak_val'])
 
             
-        
                 # Validate contents of raw data directory
+                window2['loadText'].update('Validating input directory...')
+                window2['progressBar'].UpdateBar(2)
                 checkDirect = validateDirectoryContents(filePath, compYN, normalConc, peakDet, peakConc)
 
                 if checkDirect[0] == False:
@@ -299,12 +332,13 @@ while True:
 
                 # Check for existing Excel files with same name
                 suggName = checkDirect[2]
+
                 exists = checkForOverwriting(suggName)
 
                 if exists[0] == True:
-                    if sg.popup_yes_no('A file with the file path %s already exists in this directory. \n \n Would you like to overwrite this file?' % os.path.basename(suggName)) =='NO':
+                    if sg.popup_yes_no('A file with the file path %s already exists in this directory. \n \n Would you like to overwrite this file?' % os.path.basename(suggName)) == 'No':
                         workingFilePath = exists[1]
-                        
+
                     else:
                         os.remove(suggName)
                         workingFilePath = (suggName)
@@ -314,6 +348,8 @@ while True:
                     workingFilePath = suggName
                     
                 # Prepare working file
+                window2['loadText'].update('Preparing working file...')
+                window2['progressBar'].UpdateBar(3)
                 workingFile = workingfileprep(filePath, workingFilePath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
                                               injectLength, injectDiam, proteinName, ligandName, ligandConc, dataType,
                                               compYN, normalConc, windowWidth, peakDet, manualPeaks, peakConc)
@@ -321,12 +357,29 @@ while True:
 
         # Unmask signals with compensation procedure if indicated
         if valid:
+            
             if compYN == "Y" :
-                compensate(workingFile)
-                
-
+                window2['loadText'].update('Compensating data...')
+                window2['progressBar'].UpdateBar(4)
+    
+                if compensate(workingFile) == False:
+                    window2.close()
+                    valid = False
+                    
+        if  valid:
             # Analyze signals, update Excel working file and generate subfolder with separagrams and binding isotherm
+            window2['loadText'].update('Analyzing data...')
+            window2['progressBar'].UpdateBar(5)
+
             graphPath = dataanalysis(workingFile)
+            if graphPath == False:
+                window2.close()
+                valid = False
+
+        if valid:
+            # Load graoh images to display
+            window2['loadText'].update('Formatting output data...')
+            window2['progressBar'].UpdateBar(9)
             images = natsorted(glob.glob('%s/*.png' % graphPath))
             load_image(images[0],window)
                 
@@ -341,10 +394,13 @@ while True:
             df = df.dropna(how='any')
             data = df.values.tolist()
             window['Kd'].update(values=data, num_rows=3)
-                
+            window2['loadText'].update('prACTISed complete!')
+            window2['progressBar'].UpdateBar(10)
+            
             # Show output column and report
             window['out'].update(visible=True)
             window['report'].update(visible=True)
+            window2.close()
 
         
     # Buttons for image viewer in GUI
