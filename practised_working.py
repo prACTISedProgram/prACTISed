@@ -1,8 +1,23 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-#20220716 JL    NOTE: natsort dependecy - variables to be passed from GUI, potentially add to GUI entries
-#20220720 JL    NOTE: adding all experimental parameters
-#20220722 JL    NOTE: added .txt file type, allows various concentration prefixes
-#20220906 JL    NOTE: added .dat files with Sven Kochmann's 2019 Knuteon
+# practised_working.py generates an Excel working file from ACTIS
+# experimental data for use with practised.py
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime, sepLength, sepDiam,
                     injectLength, injectDiam, proteinName, ligandName, ligandConc,
@@ -28,8 +43,8 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
     from natsort import natsorted
     from datetime import date
 
-    from knuteoncopy import readTrace, variant_to_system_time, read_traces, extract_trace
-    import pwexplode 
+    from practised_knuteon import readTrace, variant_to_system_time, read_traces, extract_trace
+    import practised_pwexplode 
 
     # Testing script execution time
     import time
@@ -37,6 +52,7 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
 
 
     d = {}
+    timeRun = {}
     prefix=""
 
     def isfloat(num):
@@ -102,8 +118,13 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
                 if conc in d:
                     d[conc].insert(len(d[conc].columns), "Experiment " + str(runNumber), run["Experiment " + str(runNumber)])
 
+                    if runNumber < timeRun[conc]:
+                            d[conc].loc[:,'raw time'] = run.iloc[:,0]
+                            timeRun[conc] = runNumber
+
                 elif conc not in d:
                     d[conc]=run
+                    timeRun[conc] = runNumber
                 
             # Extract the preamble information from .asc or .txt files
             elif file.endswith((".txt", ".asc")):
@@ -139,15 +160,21 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
                     run = run.fillna(0)
                     run = run.iloc[:,[0,1]]
                     run.columns = ["raw time", "Experiment " + str(runNumber)]
-                    run.iloc[:,0] = run.iloc[:,0].mul(60)
+                    if '(s)' not in preamble[0]:
+                        run.iloc[:,0] = run.iloc[:,0].mul(60)
 
 
                     # Create or add experiment to dataframe if it exists
                     if conc in d:
                         d[conc].insert(len(d[conc].columns), "Experiment " + str(runNumber), run["Experiment " + str(runNumber)])
 
+                        if runNumber < timeRun[conc]:
+                            d[conc].loc[:,'raw time'] = run.iloc[:,0]
+                            timeRun[conc] = runNumber
+                            
                     elif conc not in d:
                         d[conc]=run
+                        timeRun[conc] = runNumber
 
                 # If multiplier needed extract signals, signal multipler, and iterate over signals
                 elif len(preamble) > 1:
@@ -184,6 +211,7 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
         orderedExp.remove("raw time")
         orderedExp.insert(0,"raw time")
         d[xConc] = d[xConc].reindex(columns = orderedExp)
+
             
     orderedDict = natsorted(d.keys())
 
@@ -236,4 +264,3 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
     print("Script run time: %.2f seconds" %(end-start))
 
     return workingFilePath
-
