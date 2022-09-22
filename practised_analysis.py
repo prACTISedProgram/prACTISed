@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-                 
+# -*- coding: utf-8 -*-
 
-# ACTIS - Kd Determination Program
-# July 12, 2022
+# practised_analysis.py calculates the Kd value from ACTIS experimental
+# data in an Excel working file formatted for practised.py. Generates
+# separagram and binding isotherm graphs
 
-#20220708 JL    NOTE: Program no longer generates temporary Excel files
-#20220711 JL    NOTE: Verbose statements added, all graphs returned at end of script
-#20220712 JL    NOTE: Added: export data to inputted Excel, superimposing separagrams and option to choose concentration to calculate peak signal
-#20220720 JL    NOTE: Formatting graphs, allows flexibility to drop a run, and input sheet copied to outputsheet
-#20220722 JL    NOTE: Wrapping as a function to be called by GUI
+# Copyright (C) 2022  Jessica Latimer
 
-# This program extracts ACTIS titration data in a Microsoft Excel file (.xlsx) organized in a particular way*,
-# and determines the signal (average peak height within a detection window) for each concentration and a corresponding
-# R value for each concentration, then plots a binding isotherm for R vs Protein Concentration and performs
-# non-linear curve fitting to calculate and output the Kd value for the experiment
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
 
-# The program code as shown by default below requires the Microsoft Excel workbook to be organized in the following format:
-# - Data for each concentration must be contained in separate worksheets within the Excel file, with each sheet being named in the following format: "# µM".
-# - The time intervals are written in column A
-# - Row 2 of each worksheet must be the first row containing data
-# - Cell A1 is denoted as "raw time"
-# - Cells A# are denoted as "Experiment #"
-# - The signal measurement for each run is written in each corresponding column of the worksheet
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 
 def dataanalysis(fileName):
         
@@ -112,7 +110,7 @@ def dataanalysis(fileName):
 
                 peakSignal = max(yvalues[xvalues>=injectionTime])
                 peakIndex = yvalues[yvalues == peakSignal].index
-                peakTime = xvalues[peakIndex]
+                peakTime = float(xvalues[peakIndex])
 
         # Determine absolute max signal value and max number of runs (used to set graph parameters)
         maxSig = 0
@@ -170,11 +168,22 @@ def dataanalysis(fileName):
                 # Set time window parameters using peak time and determine the average signal within window for each run             
                 windowLow = float(peakTime - (percentage * peakTime))
                 windowHigh = float(peakTime + (percentage * peakTime))
-                windowIndex = xvalues.between(windowLow,windowHigh)
-                windowTimes = xvalues[windowIndex]
-                windowSignals = yvalues[windowIndex]
-                avgSigsRun.append(np.average(windowSignals))
-          
+
+                if percentage > 0:
+                        windowIndex = xvalues.between(windowLow,windowHigh, inclusive='both')
+                        windowTimes = xvalues[windowIndex]
+                        windowSignals = yvalues[windowIndex]
+                        
+                elif percentage == 0:
+                        closestIndex = xvalues.searchsorted(float(peakTime), side='left')
+                        if xvalues[closestIndex] - peakTime >= 0.5:
+                                sg.popup_ok('prACTISed cancelled \n \nError: No time %s found in %s run %s. \nPlease try again with same times for all experimental runs.' % (peakTime, conc1, col))
+                                return False
+                
+                        windowSignals = yvalues[closestIndex]
+
+                avgSigsRun.append(np.mean(windowSignals))
+                
 
                 # Graph the signal for each run and with time window indicated
                 plt.plot(xvalues, yvalues)
@@ -199,8 +208,7 @@ def dataanalysis(fileName):
                 avgSigConc = np.average(avgSigsRun)
                 avgSigConc_stdev = np.std(avgSigsRun)
                 avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
-
-                        
+  
                 concentration.append(conc1)
                 signal.append(avgSigConc)    
                 stddev.append(avgSigConc_stdev)
@@ -291,7 +299,7 @@ def dataanalysis(fileName):
 
         xFit = np.arange(0.0, max(concs), concs[step])
         plt.plot(xFit, LevenMarqu(xFit, popt), linewidth=1.5, color='black', label="Best Fit")
-        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.2f ± %.2f %s' % (popt, error, unit), fontweight='bold')
+        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.3g ± %.3g %s' % (popt, error, unit), fontweight='bold')
         plt.ylabel('R', fontweight='bold')
         plt.xlabel(r'[%s]$\mathbf{_0}$ (%s)' % (proteinName,unit), fontweight='bold')
         plt.xscale("log")
