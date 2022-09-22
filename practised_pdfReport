@@ -1,4 +1,23 @@
-# This code generates, saves and opens a summary pdf report from practised output
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# practised_pdfReport.py generates, saves and opens a summary pdf report
+# from practised.py output
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import PySimpleGUI as sg
@@ -19,7 +38,6 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 import math
 from scipy.optimize import curve_fit
 from scipy import interpolate
-from datetime import date
 import time
 from natsort import natsorted
 from fpdf import FPDF
@@ -46,7 +64,9 @@ def report (workingFile, graphFolder):
     pdf.add_page()
     pdf.set_font('Times', size=10)
 
-    pdf.cell(pdf.epw/2, pdf.font_size*2, '%s_%s' % (proteinName,date.today()))
+    title = os.path.basename(workingFile)
+    title = os.path.splitext(title)[0]
+    pdf.cell(pdf.epw/2, pdf.font_size*2, '%s' % title)
 
     current = pdf.get_y() +5
     pdf.set_y(current)
@@ -113,7 +133,6 @@ def report (workingFile, graphFolder):
                 pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
                 pos = 1.2
 
-    currentFolder = os.path.dirname(workingFile)
-    pdfNAME = '%s/%s_%s' % (currentFolder, proteinName, date.today())
+    pdfNAME = '%s.pdf' % (os.path.splitext(workingFile)[0])
     pdf.output(pdfNAME)
     webbrowser.open_new('file://%s' % pdfNAME)
