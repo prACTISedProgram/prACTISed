@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# practised_pdfReport.py generates, saves and opens a summary pdf report
+# from practised.py output
+
+# Copyright (C) 2022  Jessica Latimer
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+import PySimpleGUI as sg
+
+import os
+import pathlib
+import glob
+
+from PIL import Image, ImageTk
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from openpyxl import load_workbook
+from openpyxl import Workbook
+from openpyxl.utils import FORMULAE
+from openpyxl.utils import get_column_letter, column_index_from_string
+import math
+from scipy.optimize import curve_fit
+from scipy import interpolate
+import time
+from natsort import natsorted
+from fpdf import FPDF
+import webbrowser
+
+
+def report (workingFile, graphFolder):
+    # Read in data tables from working file
+    userInputs = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="A:B", engine='openpyxl')
+    proteinName = str(userInputs.iloc[7,1])
+    userLength = userInputs.shape[0]
+    userInputs = userInputs.values.tolist()
+
+    summaryTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
+    summaryTable = summaryTable.dropna(how='any')
+    sumLength = summaryTable.shape[0]
+    summaryTable = summaryTable.values.tolist()
+
+    kdTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
+    kdTable = kdTable.dropna(how='any')
+    kdTable = kdTable.values.tolist()
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Times', size=10)
+
+    title = os.path.basename(workingFile)
+    title = os.path.splitext(title)[0]
+    pdf.cell(pdf.epw/2, pdf.font_size*2, '%s' % title)
+
+    current = pdf.get_y() +5
+    pdf.set_y(current)
+    pdf.image("%s/bindingisotherm.png" % (graphFolder), w = pdf.epw/2)
+    pdf.set_y(current)
+    pdf.image("%s/allconcentration.png" % (graphFolder), w = pdf.epw/2, x = pdf.epw/2)
+
+    # Add summary table to pdf
+    current = pdf.get_y() + 5
+    pdf.set_y(current)
+    for row in summaryTable:
+        pdf.set_x(2.5*(pdf.epw/5))
+        
+        for col in row:
+            pdf.multi_cell(pdf.epw/12 , pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add Kd and statistics to pdf
+    pdf.set_y(current + pdf.font_size*2*sumLength + 5)
+    for row in kdTable:
+        pdf.set_x(2.5*(pdf.epw/5))
+        
+        for col in row:
+            if col.find('χ') != -1:
+                col = col.replace("χ", "Chi")
+            pdf.multi_cell(pdf.epw/4 , pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add user input table to pdf
+    pdf.set_y(current)
+
+    for row in userInputs:
+        for col in row:
+            pdf.multi_cell(pdf.epw/5, pdf.font_size*2, str(col), border=1,
+                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    # Add separagram images to pdf
+    images = natsorted(glob.glob('%s/*.png' % graphFolder))
+    pdf.add_page()
+    pos = 0.2
+    graphY = pdf.get_y()
+    count = 0
+
+    for img in images:
+        if img.endswith(('M.png', 'legend.png')):
+            count +=1
+            if count/16 == 1:
+                pdf.add_page()
+                count = 0
+                
+            if pos < 3:
+                pdf.set_y(graphY)
+                pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
+                pdf.ln(0)
+                pos +=1
+                
+            elif pos == 3.2:
+                pos = 0.2
+                graphY = pdf.get_y()+5
+                pdf.set_y(graphY)
+                pdf.image(img, w = pdf.epw/3, x = pos*pdf.epw/3)
+                pos = 1.2
+
+    pdfNAME = '%s.pdf' % (os.path.splitext(workingFile)[0])
+    pdf.output(pdfNAME)
+    webbrowser.open_new('file://%s' % pdfNAME)
