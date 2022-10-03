@@ -22,10 +22,6 @@
 
 
 def dataanalysis(fileName):
-        
-        # Testing script execution time
-        import time
-        start = time.time()
 
         ## Part 1 - Importing the required libraries and sub-libraries required below
         import argparse                                   
@@ -93,10 +89,11 @@ def dataanalysis(fileName):
         relstddev = []
         Rvalue = []
         Rstddev = []
+        relRstddev = []
         graphs = []
         graphNames = []
-        forDF = [concentration,signal,stddev,relstddev,Rvalue,Rstddev]
-        DFnames = ["Conc","Avg Signal","Std Dev","Rel Std Dev","R value","R Std Dev"]
+        forDF = [concentration,signal,stddev,relstddev,Rvalue,Rstddev,relRstddev]
+        DFnames = ["Conc","Avg Sig (S)","S Std Dev","S Rel Std Dev","R value","R Std Dev", "R Rel Std Dev"]
 
         # If programmatic determination of peak use first run at specified concentration to calculate peak time and time window
         if peakDet == "P":
@@ -108,7 +105,12 @@ def dataanalysis(fileName):
                 xvalues = data['raw time']
                 yvalues = data.iloc[:,1]
 
-                peakSignal = max(yvalues[xvalues>=injectionTime])
+                # Convert raw time to propagation time
+                yvalues = yvalues[xvalues >= injectionTime]
+                xvalues = xvalues[xvalues >= injectionTime]
+                xvalues = xvalues.subtract(injectionTime)
+
+                peakSignal = max(yvalues)
                 peakIndex = yvalues[yvalues == peakSignal].index
                 peakTime = float(xvalues[peakIndex])
 
@@ -158,6 +160,10 @@ def dataanalysis(fileName):
                 background_average = np.average(background_yvalues)
                 background_stdev = np.std(background_yvalues)
 
+                # Convert raw time to propagation time
+                yvalues = yvalues[xvalues >= injectionTime]
+                xvalues = xvalues[xvalues >= injectionTime]
+                xvalues = xvalues.subtract(injectionTime)
 
                 # If manual determination, extract the manually set peak time for given concentration
                 if peakDet == "M":   
@@ -183,19 +189,19 @@ def dataanalysis(fileName):
                         windowSignals = yvalues[closestIndex]
 
                 avgSigsRun.append(np.mean(windowSignals))
-                
+
 
                 # Graph the signal for each run and with time window indicated
                 plt.plot(xvalues, yvalues)
                 
 
             # Appending a figure with all experimental runs for concentration
-            plt.xlabel('Propagation time (s)', fontweight='bold')
+            plt.xlabel('Propagation time (s)', fontweight='bold',fontsize=10)
             if dataType == "MS":
-                    plt.ylabel('MS intensity (a.u.)', fontweight='bold')
+                    plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=10)
             elif dataType == "F":
-                    plt.ylabel('Fluorescence (a.u.)', fontweight='bold')
-            plt.text(minTime,maxSig*1.05, r"[%s]$\mathbf{_0}$ = %s" % (proteinName, conc1), fontweight='bold')
+                    plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=10)
+            plt.text(minTime,maxSig*1.05, r"[%s]$\mathbf{_0}$ = %s" % (proteinName, conc1), fontweight='bold', fontsize=10)
             plt.vlines(windowLow, 0, maxSig*1.05, linestyles='dashed',color='gray')
             plt.vlines(windowHigh, 0, maxSig*1.05, linestyles='dashed',color='gray')
             plt.savefig("%s/%s.png" % (subdirect, conc1))
@@ -204,7 +210,7 @@ def dataanalysis(fileName):
 
             
             # Calculating average signal for each concentration, stdev and relative stdev        
-            if peakDet == "P" and float(conc1.partition(" ")[0]) >= windowCalcConc:
+            if peakDet == "P":
                 avgSigConc = np.average(avgSigsRun)
                 avgSigConc_stdev = np.std(avgSigsRun)
                 avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
@@ -213,6 +219,11 @@ def dataanalysis(fileName):
                 signal.append(avgSigConc)    
                 stddev.append(avgSigConc_stdev)
                 relstddev.append(avgSigConc_relstdev)
+                
+                if float(conc1.partition(" ")[0]) < windowCalcConc:
+                        Rvalue.append(None)
+                        Rstddev.append(None)
+                        relRstddev.append(None)
 
             
         # Generate legend for run colors
@@ -236,15 +247,20 @@ def dataanalysis(fileName):
             xvalues = data['raw time']
             yvalues = data.iloc[:, 1]
 
+            # Convert raw time to propagation time
+            yvalues = yvalues[xvalues >= injectionTime]
+            xvalues = xvalues[xvalues >= injectionTime]
+            xvalues = xvalues.subtract(injectionTime)
+
             p = plt.plot(xvalues, yvalues, label= '%s' % conc1)   
 
-        plt.xlabel('Propagation time (s)', fontweight='bold')
+        plt.xlabel('Propagation time (s)', fontweight='bold', fontsize=10)
         if dataType == "MS":
-                plt.ylabel('MS intensity (a.u.)', fontweight='bold')
+                plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=10)
         elif dataType == "F":
-                plt.ylabel('Fluorescence (a.u.)', fontweight='bold')
-        plt.text(minTime, maxSig*1.05, r"[%s]$\mathbf{_0}$"  % (proteinName), fontweight='bold')
-        plt.legend()
+                plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=10)
+        plt.text(minTime, maxSig*1.05, r"[%s]$\mathbf{_0}$"  % (proteinName), fontweight='bold', fontsize=10)
+        plt.legend(fontsize=10)
         if peakDet == "P":
                 plt.vlines(windowLow, 0, maxSig*1.05, linestyles='dashed',color='gray')
                 plt.vlines(windowHigh, 0, maxSig*1.05, linestyles='dashed',color='gray')
@@ -258,31 +274,40 @@ def dataanalysis(fileName):
 
 
         ## Part 5 - Calculate R values and standard deviation of R values for each concentration 
-        LowProt_sig = signal[0]
+        LowProt_sig = signal[len(Rvalue)]
         HighProt_sig = signal[len(concentration)-1]
-        LowProt_stddev = stddev[0]
+        LowProt_stddev = stddev[len(Rvalue)]
         HighProt_stdDev = stddev[len(concentration)-1]
 
-        for y in range(0, len(concentration)-1):
-                conc2 = idealSheet.cell(y+1,5).value
-                avgSigConc_R = (signal[y] - HighProt_sig)/ (LowProt_sig - HighProt_sig) 
-                Rvalue.append(avgSigConc_R)
 
-                avgSiglConc_Rstddev = ( 1/(LowProt_sig - HighProt_sig) * math.sqrt( (stddev[y]**2) + ((signal[y] - LowProt_sig)/ (LowProt_sig - HighProt_sig) * HighProt_stdDev)**2 +
-                                                                               ((HighProt_sig - signal[y])/(LowProt_sig - HighProt_sig) * LowProt_stddev)**2))
-                Rstddev.append(avgSiglConc_Rstddev)
-            
+        for y in range(0, len(concentration)):
+                conc2 = idealSheet.cell(y+1,5).value
+                if float(conc2.partition(" ")[0]) >= windowCalcConc:
+                        avgSigConc_R = (signal[y] - HighProt_sig)/ (LowProt_sig - HighProt_sig) 
+                        Rvalue.append(avgSigConc_R)
+
+                        avgSiglConc_Rstddev = ( 1/(LowProt_sig - HighProt_sig) * math.sqrt( (stddev[y]**2) + ((signal[y] - LowProt_sig)/ (LowProt_sig - HighProt_sig) * HighProt_stdDev)**2 +
+                                                                                       ((HighProt_sig - signal[y])/(LowProt_sig - HighProt_sig) * LowProt_stddev)**2))
+                        Rstddev.append(avgSiglConc_Rstddev)
+                        avgSiglConc_relRstddev = (avgSiglConc_Rstddev/avgSigConc_R)*100
+                        relRstddev.append(avgSiglConc_relRstddev)
+  
+        
         ## Part 6 - Plotting the binding isotherm R vs P[0] with curve of best fit
         # Convert concentration strings to floats
         concs = []
-        for element in range(0, len(concentration)-1):
+        for element in range(0, len(concentration)):
                 num = concentration[element].partition(" ")[0]
-                concs.append(float(num))
+                if float(num) >= windowCalcConc:
+                        concs.append(float(num))
         unit = concentration[0].partition(" ")[2]
 
+        Rvalue_drop = [i for i in Rvalue if i is not None]
+        Rstddev_drop = [i for i in Rstddev if i is not None]
+        
         # Plotting data points for each concentration
-        plt.scatter(concs, Rvalue, c='white', edgecolor='black', label="R", zorder=10)
-        plt.errorbar(concs, Rvalue, yerr = Rstddev, linestyle="none", ecolor = 'black', elinewidth=1, capsize=2, capthick=1, zorder=0)
+        plt.scatter(concs, Rvalue_drop, c='white', edgecolor='black', label="R", zorder=10)
+        plt.errorbar(concs, Rvalue_drop, yerr = Rstddev_drop, linestyle="none", ecolor = 'black', elinewidth=1, capsize=2, capthick=1, zorder=0)
         plt.xscale("log")
                       
         # Define the Levenberg Marquardt algorithm
@@ -290,7 +315,7 @@ def dataanalysis(fileName):
             return -((a + x - ligandConc)/(2*ligandConc)) + ((((a + x - ligandConc)/(2*ligandConc))**2) + (a/ligandConc))**(0.5)
 
         # Curve fitting and plotting curve of best fit    
-        popt, pcov = curve_fit(LevenMarqu, concs, Rvalue)
+        popt, pcov = curve_fit(LevenMarqu, concs, Rvalue_drop)
         error = np.sqrt(np.diag(pcov))
 
         step=0
@@ -299,22 +324,22 @@ def dataanalysis(fileName):
 
         xFit = np.arange(0.0, max(concs), concs[step])
         plt.plot(xFit, LevenMarqu(xFit, popt), linewidth=1.5, color='black', label="Best Fit")
-        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.3g ± %.3g %s' % (popt, error, unit), fontweight='bold')
-        plt.ylabel('R', fontweight='bold')
-        plt.xlabel(r'[%s]$\mathbf{_0}$ (%s)' % (proteinName,unit), fontweight='bold')
+        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.3g ± %.3g %s' % (popt, error, unit), fontweight='bold', fontsize=10)
+        plt.ylabel('R', fontweight='bold', fontsize=10)
+        plt.xlabel(r'[%s]$\mathbf{_0}$ (%s)' % (proteinName,unit), fontweight='bold',fontsize=10)
         plt.xscale("log")
-        plt.legend()
+        plt.legend(fontsize=10)
         plt.savefig("%s/bindingisotherm.png" % subdirect)           # save binding isotherm graph
         graphs.append(plt.figure())
         plt.close()
 
         # Statistics
-        residuals = Rvalue - LevenMarqu(concs, *popt)
+        residuals = Rvalue_drop - LevenMarqu(concs, *popt)
         ss_res = np.sum(residuals**2)
-        ss_tot = np.sum((Rvalue - np.mean(Rvalue))**2)
+        ss_tot = np.sum((Rvalue_drop - np.mean(Rvalue_drop))**2)
         r_squared = 1 - (ss_res/ss_tot)
 
-        chiSquared = sum((((Rvalue - LevenMarqu(concs, *popt))**2) / LevenMarqu(concs, *popt)))
+        chiSquared = sum((((Rvalue_drop - LevenMarqu(concs, *popt))**2) / LevenMarqu(concs, *popt)))
 
 
         ## Part 7 - Returning summary data and graphs
@@ -332,22 +357,20 @@ def dataanalysis(fileName):
         outputSheet = inputBook.worksheets[len(inputBook.sheetnames)-1]
 
         # Duplicate input sheet information onto output sheet for reproducibility
-        for r in range(1, 18):
+        for r in range(1, 19):
                 for c in range (1, 3):
                         outputSheet.cell(row=r, column=c).value = idealSheet.cell(row=r, column=c).value
 
         
         # Include Kd, R² and χ² values on output sheet
-        outputSheet["K1"] = "Kd: %.4f ± %.4f %s" % (popt,error,unit)
-        outputSheet["K2"] = "R²: %.4f" % (r_squared)
-        outputSheet["K3"] = "χ²: %.4f" % (chiSquared)
+        outputSheet["L1"] = "Kd: %.4f ± %.4f %s" % (popt,error,unit)
+        outputSheet["L2"] = "R²: %.4f" % (r_squared)
+        outputSheet["L3"] = "χ²: %.4f" % (chiSquared)
 
         inputBook.save(fileName)
-
-        # Testing script execution time
-        end = time.time()
-        print("Script run time: %.2f seconds" %(end-start))
         
         plt.close('all')
 
         return subdirect
+
+
