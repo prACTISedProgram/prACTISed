@@ -62,19 +62,19 @@ sg.theme('DarkBlue3')
 inputCol = [
     [sg.Frame('Fluidics Experimental Parameters', 
               [[sg.Text('Propagation flow rate', size=(27,1), key ='propFlow'),
-                sg.Input(size=(14,1), key='propFlow_val')],
+                sg.Input('µL/min', size=(14,1), key='propFlow_val')],
                [sg.Text('Injection flow rate', size=(27,1),key='injectFlow'),
-                sg.Input(size=(14,1), key='injectFlow_val')],
+                sg.Input('µL/min', size=(14,1), key='injectFlow_val')],
                [sg.Text('Injection time (s) *', size=(27,1), key='injectTime'),
                 sg.Input(size=(14,1), key='injectTime_val')],
                [sg.Text('Separation capillary length', size=(27,1), key='sepLength'),
-                sg.Input(size=(14,1), key='sepLength_val')],
+                sg.Input('cm', size=(14,1), key='sepLength_val')],
                [sg.Text('Separation capillary diameter', size=(27,1), key='sepDiam'),
-                sg.Input(size=(14,1), key='sepDiam_val')],
+                sg.Input('µm', size=(14,1), key='sepDiam_val')],
                [sg.Text('Injection loop length', size=(27,1), key='injectLength'),
-                sg.Input(size=(14,1), key='injectLength_val')],
+                sg.Input('cm', size=(14,1), key='injectLength_val')],
                [sg.Text('Injection loop diameter', size=(27,1), key='injectDiam'),
-                sg.Input(size=(14,1), key='injectDiam_val')]],
+                sg.Input('µm', size=(14,1), key='injectDiam_val')]],
               key = 'fluidParam')],
 
 
@@ -88,23 +88,26 @@ inputCol = [
               key='concFrame')],
     
     [sg.Frame('Data Analyis Parameters',
-              [[sg.Text('Type of data *', size=(11,1), key ='dataType'),
-                sg.Radio('Fluoresence', 'dataChoice', key ='dataF', enable_events=True),
+              [[sg.Text('Type of data *', size=(27,1), key ='dataType'),
+                sg.Radio('Fluoresence', 'dataChoice', key ='dataF', enable_events=True, default=True)],
+               [sg.Text('', size=(27,1), key ='blank'),
                 sg.Radio('Mass Spec', 'dataChoice', key ='dataMS', enable_events=True)],
-               [sg.Text('Compensation procedure *     \n (recommended for MS data)', key ='comp'),
-                sg.Radio('Yes', 'compChoice', key ='compYes', enable_events=True),
-                sg.Radio('No', 'compChoice', key ='compNo', enable_events=True)],
+               [sg.Text('Compensation procedure *           \n (recommended for MS data)', key ='comp'),
+                sg.Radio('Yes', 'compChoice', key ='compYes', enable_events=True)],
+               [sg.Text('', size=(27,1), key ='blank'),
+                sg.Radio('No', 'compChoice', key ='compNo', enable_events=True, default=True)],
                [sg.Text(u'[P]\u2080 reference for normalization *', size=(27,1), key='normConc', visible=False),
                 sg.Input(size=(14,1), key='normConc_val', visible=False)],
                [sg.Text('Window width (%) *', size=(27,1), key='window'),
-                sg.Input(size=(14,1), key='window_val')],
-               [sg.Text('Determination of peak *', size=(18,1), key ='peak'),
-                sg.Radio('Manual', 'peakChoice', key ='peakM', enable_events=True),
-                sg.Radio('Program', 'peakChoice', key ='peakP', enable_events=True)],
+                sg.Input('2', size=(14,1), key='window_val')],
+               [sg.Text('Determination of peak *', size=(27,1), key ='peak'),
+                sg.Radio('Manual', 'peakChoice', key ='peakM', enable_events=True)],
+               [sg.Text('', size=(27,1), key ='blank'),
+                sg.Radio('Programmatic', 'peakChoice', key ='peakP', enable_events=True, default=True)],
                [sg.Text(u'Peaks for concentrations [P]\u2080 * \n (ascending [P]\u2080, separated by commas)', key='manPeaks', visible=False)],
                [sg.Input(size=(43,1), key='manPeaks_val', visible=False)],
-               [sg.Text(u'Specify [P]\u2080 used to determine peak *', size=(30,1), key='progPeak', visible=False),
-                sg.Input(size=(11,1), key='progPeak_val', visible=False)]],
+               [sg.Text(u'Specify [P]\u2080 used to determine peak *', size=(30,1), key='progPeak', visible=True),
+                sg.Input(size=(11,1), key='progPeak_val', visible=True)]],
               key='analysisParam')],
     
     [sg.Text('* Required field', key = 'req'),]
@@ -115,7 +118,7 @@ inputCol = [
 outputCol= [
     [sg.Table(values=[],headings=['prACTISed output'], key='Kd', hide_vertical_scroll=True, def_col_width=20, auto_size_columns=False)],
 
-    [sg.Table(values=[], headings=['Conc','Avg Signal', 'Std Dev', 'Rel Std Dev', 'R value', 'R Std Dev'], key='summary', def_col_width=10,auto_size_columns=False)],
+    [sg.Table(values=[], headings=['Conc','Avg Sig (S)', 'S Std Dev', 'S Rel Std Dev', 'R value', 'R Std Dev', 'R Rel Std Dev'], key='summary', def_col_width=10,auto_size_columns=False)],
 
     [sg.Frame('Graphs',
               [[sg.Image(key='graphImage')],
@@ -327,6 +330,7 @@ while True:
                     errorMessage = genErrorMessageDirect(checkDirect[1])
                     sg.popup(errorMessage)
                     window.close()
+                    window2.close()
                     break
                 
 
@@ -346,7 +350,8 @@ while True:
                     
                 elif exists[0] == False:
                     workingFilePath = suggName
-                    
+
+                
                 # Prepare working file
                 window2['loadText'].update('Preparing working file...')
                 window2['progressBar'].UpdateBar(3)
@@ -354,7 +359,7 @@ while True:
                                               injectLength, injectDiam, proteinName, ligandName, ligandConc, dataType,
                                               compYN, normalConc, windowWidth, peakDet, manualPeaks, peakConc)
 
-
+                
         # Unmask signals with compensation procedure if indicated
         if valid:
             
@@ -365,7 +370,8 @@ while True:
                 if compensate(workingFile) == False:
                     window2.close()
                     valid = False
-                    
+
+                
         if  valid:
             # Analyze signals, update Excel working file and generate subfolder with separagrams and binding isotherm
             window2['loadText'].update('Analyzing data...')
@@ -376,6 +382,7 @@ while True:
                 window2.close()
                 valid = False
 
+
         if valid:
             # Load graoh images to display
             window2['loadText'].update('Formatting output data...')
@@ -384,14 +391,14 @@ while True:
             load_image(images[0],window)
                 
             # Read in summary and Kd information from working file to display in GUI output
-            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
-            df = df.dropna(how='any')
+            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:J", engine='openpyxl')
+            df = df.dropna(how='all')
             headers = df.iloc[0].values.tolist()
             data = df.iloc[1:].values.tolist()
             window['summary'].update(values=data, num_rows=min(10,len(data)))
 
-            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
-            df = df.dropna(how='any')
+            df = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="L", engine='openpyxl')
+            df = df.dropna(how='all')
             data = df.values.tolist()
             window['Kd'].update(values=data, num_rows=3)
             window2['loadText'].update('prACTISed complete!')
@@ -401,7 +408,7 @@ while True:
             window['out'].update(visible=True)
             window['report'].update(visible=True)
             window2.close()
-
+            
         
     # Buttons for image viewer in GUI
     if event == 'fwd':
@@ -423,3 +430,5 @@ while True:
         report(workingFile, graphPath) 
 
 window.close()
+
+
