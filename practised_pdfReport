@@ -47,17 +47,17 @@ import webbrowser
 def report (workingFile, graphFolder):
     # Read in data tables from working file
     userInputs = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="A:B", engine='openpyxl')
-    proteinName = str(userInputs.iloc[7,1])
     userLength = userInputs.shape[0]
-    userInputs = userInputs.values.tolist()
-
-    summaryTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:I", engine='openpyxl')
-    summaryTable = summaryTable.dropna(how='any')
+    userInputs1 = userInputs.iloc[:,0].to_frame().values.tolist()
+    userInputs2 = userInputs.iloc[:,1].to_frame().values.tolist()
+    
+    summaryTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="D:J", engine='openpyxl')
+    summaryTable = summaryTable.dropna(how='all')
     sumLength = summaryTable.shape[0]
     summaryTable = summaryTable.values.tolist()
 
-    kdTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="K", engine='openpyxl')
-    kdTable = kdTable.dropna(how='any')
+    kdTable = pd.read_excel(workingFile, sheet_name=-1, header=None, usecols="L", engine='openpyxl')
+    kdTable = kdTable.dropna(how='all')
     kdTable = kdTable.values.tolist()
 
     pdf = FPDF()
@@ -72,23 +72,23 @@ def report (workingFile, graphFolder):
     pdf.set_y(current)
     pdf.image("%s/bindingisotherm.png" % (graphFolder), w = pdf.epw/2)
     pdf.set_y(current)
-    pdf.image("%s/allconcentration.png" % (graphFolder), w = pdf.epw/2, x = pdf.epw/2)
+    pdf.image("%s/allconcentration.png" % (graphFolder), w = pdf.epw/2, x = pdf.epw/2+10)
 
     # Add summary table to pdf
     current = pdf.get_y() + 5
     pdf.set_y(current)
     for row in summaryTable:
-        pdf.set_x(2.5*(pdf.epw/5))
+        pdf.set_x(2*(pdf.epw/5))
         
         for col in row:
-            pdf.multi_cell(pdf.epw/12 , pdf.font_size*2, str(col), border=1,
+            pdf.multi_cell(pdf.epw/10.5 , pdf.font_size*2, str(col), border=1,
                     new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
         pdf.ln(pdf.font_size*2)
 
     # Add Kd and statistics to pdf
     pdf.set_y(current + pdf.font_size*2*sumLength + 5)
     for row in kdTable:
-        pdf.set_x(2.5*(pdf.epw/5))
+        pdf.set_x(2 *(pdf.epw/5))
         
         for col in row:
             if col.find('χ') != -1:
@@ -100,10 +100,20 @@ def report (workingFile, graphFolder):
     # Add user input table to pdf
     pdf.set_y(current)
 
-    for row in userInputs:
+    for row in userInputs1:
         for col in row:
             pdf.multi_cell(pdf.epw/5, pdf.font_size*2, str(col), border=1,
-                    new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+                        new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
+        pdf.ln(pdf.font_size*2)
+
+    pdf.set_y(current)
+    
+    for row in userInputs2:
+        pdf.set_x(pdf.epw/4 + 0.45)
+        
+        for col in row:
+            pdf.multi_cell(pdf.epw/8, pdf.font_size*2, str(col), border=1,
+                        new_x="RIGHT", new_y="TOP", align="L", max_line_height=pdf.font_size)
         pdf.ln(pdf.font_size*2)
 
     # Add separagram images to pdf
