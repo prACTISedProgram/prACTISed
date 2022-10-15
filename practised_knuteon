@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-#20220906 JL    Note: This codee was modified from Sven Kochmann's 2019 Knuteon
+#20220906 JL    Note: This code was modified from Sven Kochmann's 2019 Knuteon
 
 # Knuteon!
 # Copyright (C) 2019 by Sven Kochmann
@@ -99,7 +99,7 @@ def extract_trace(ole, header):
                                 readablock = False
 
                 # Decompress all the data
-                decompresseddata = pwexplode.explode(compresseddata)
+                decompresseddata = practised_pwexplode.explode(compresseddata)
         else:
                 # Each data point is an integer of 4 bytes, read all in here
                 decompresseddata = datastream.read(nopoints * 4)
