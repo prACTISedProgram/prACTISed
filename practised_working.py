@@ -44,12 +44,8 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
     from datetime import date
 
     from practised_knuteon import readTrace, variant_to_system_time, read_traces, extract_trace
-    import practised_pwexplode 
-
-    # Testing script execution time
-    import time
-    start = time.time()
-
+    import practised_pwexplode
+    
 
     d = {}
     timeRun = {}
@@ -184,8 +180,8 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
                     run = pd.read_csv("%s/%s" %(inputPath, file), sep="\t", encoding="latin-1", skiprows=len(preamble), header=None, keep_default_na=True, na_values=str(0))
                     run = run.dropna(how="all")
                     run = run.fillna(0)
-                    run.columns = ["Experiment" + str(runNumber)]
-                    run.loc[:"Experiment" + str(runNumber)] *= signalMult
+                    run.columns = ["Experiment " + str(runNumber)]
+                    run.loc[:"Experiment " + str(runNumber)] *= signalMult
 
                     # Create or add experiment to dataframe if it exists
                     if conc in d:
@@ -257,10 +253,5 @@ def workingfileprep(inputPath, workingFilePath, propFlow, injectFlow, injectTime
     writer.save()
     writer.close()
     wb.save(workingFilePath)
-
-
-    # Testing script execution time
-    end = time.time()
-    print("Script run time: %.2f seconds" %(end-start))
 
     return workingFilePath
