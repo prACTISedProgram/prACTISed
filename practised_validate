@@ -50,12 +50,14 @@ def valStr (x):    # non-mandatory user inputs, protein name
     except ValueError:
         return [False, 'Expected a string, please try again']
 
-def valManualTimes (x):
+def valManualTimes_input (x):
     valStr(x)
     try:
         x = x.split(",")
         for time in x:
-            float(x)
+            if type(float(time)) != float:
+                return [False, 'Expected list of numerical times separated by commas, please try again']
+
         return [True, x]
     except:
         return [False, 'Expected list of numerical times separated by commas, please try again']
@@ -137,7 +139,7 @@ def confirmRequired (values):
         values_missing.append('Peaks for concentrations')
         is_input = False
     elif values['peakM'] and len(values['manPeaks_val'])>0:
-        check = valManualTimes(values['manPeaks_val'])
+        check = valManualTimes_input(values['manPeaks_val'])
         if check[0] == False:
             values_invalid.append('Peaks for concentrations - %s' % check[1])
             is_valid = False
