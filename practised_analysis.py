@@ -114,15 +114,17 @@ def dataanalysis(fileName):
                 peakIndex = yvalues[yvalues == peakSignal].index
                 peakTime = float(xvalues[peakIndex])
 
+
         # Determine absolute max signal value and max number of runs (used to set graph parameters)
         maxSig = 0
         maxRuns = 0
+        manualPeaks = []
         for x in range(1,int(numberOfConcs)+1):         
                 conc1 = idealSheet.cell(x,5).value
                 data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
                 data = data.dropna(how='all')
-                data = data.iloc[:,1:]
-                currentMaxRuns = len(data.columns)
+                data2 = data.iloc[:,1:]
+                currentMaxRuns = len(data2.columns)
                 colMax = data.max()
                 currentMax = colMax.max()
 
@@ -131,9 +133,19 @@ def dataanalysis(fileName):
                 if currentMaxRuns > maxRuns:
                     maxRuns = currentMaxRuns
 
-                
+                 # If manual determination, extract the manually set peak time for given concentrations
+                if peakDet == "M":
+                        xvalues = data.iloc[:,0]
+                        manualTimes = idealSheet.cell(17,2).value.split(",")
+                        peakIndex = xvalues.searchsorted(float(manualTimes[x-1]), side='left')
+                        peakTime = xvalues[peakIndex-1]
+                        peakTime = peakTime
+                        manualPeaks.append(peakTime)
+
+                        windowCalcConc = 1^-25
+        
         ## Part 4 - Calculating signal information for each concentration and generating separagram graphs
-        for x in range(1,int(numberOfConcs)+1):         
+        for x in range(1,numberOfConcs+1):         
             conc1 = idealSheet.cell(x,5).value
             
             avgSigConc = 0
@@ -144,7 +156,7 @@ def dataanalysis(fileName):
             data = pd.read_excel(fileName, sheet_name=conc1, engine='openpyxl')
             data = data.dropna(how='all')
             numberOfRuns = len(data.columns)
-            len(data.columns)-1
+
 
             # Calculate background signals for each run
             for col in range(1, numberOfRuns):
@@ -165,11 +177,8 @@ def dataanalysis(fileName):
                 xvalues = xvalues[xvalues >= injectionTime]
                 xvalues = xvalues.subtract(injectionTime)
 
-                # If manual determination, extract the manually set peak time for given concentration
-                if peakDet == "M":   
-                    manualTimes = idealSheet.cell(17,2).value.split(",")
-                    peakIndex = xvalues.searchsorted(float(manualTimes[x-1]), side='left')
-                    peakTime = xvalues[peakIndex-1]
+                if peakDet == "M":
+                        peakTime = manualPeaks[x-1]
 
                 # Set time window parameters using peak time and determine the average signal within window for each run             
                 windowLow = float(peakTime - (percentage * peakTime))
@@ -196,12 +205,12 @@ def dataanalysis(fileName):
                 
 
             # Appending a figure with all experimental runs for concentration
-            plt.xlabel('Propagation time (s)', fontweight='bold',fontsize=10)
+            plt.xlabel('Propagation time (s)', fontweight='bold',fontsize=13)
             if dataType == "MS":
-                    plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=10)
+                    plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=13)
             elif dataType == "F":
-                    plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=10)
-            plt.text(minTime,maxSig*1.05, r"[%s]$\mathbf{_0}$ = %s" % (proteinName, conc1), fontweight='bold', fontsize=10)
+                    plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=13)
+            plt.text(minTime,maxSig*1.05, r"[%s]$\mathbf{_0}$ = %s" % (proteinName, conc1), fontweight='bold', fontsize=13)
             plt.vlines(windowLow, 0, maxSig*1.05, linestyles='dashed',color='gray')
             plt.vlines(windowHigh, 0, maxSig*1.05, linestyles='dashed',color='gray')
             plt.savefig("%s/%s.png" % (subdirect, conc1))
@@ -209,17 +218,17 @@ def dataanalysis(fileName):
             plt.clf()
 
             
-            # Calculating average signal for each concentration, stdev and relative stdev        
+            # Calculating average signal for each concentration, stdev and relative stdev
+            avgSigConc = np.average(avgSigsRun)
+            avgSigConc_stdev = np.std(avgSigsRun)
+            avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
+
+            concentration.append(conc1)
+            signal.append(avgSigConc)
+            stddev.append(avgSigConc_stdev)
+            relstddev.append(avgSigConc_relstdev)
+
             if peakDet == "P":
-                avgSigConc = np.average(avgSigsRun)
-                avgSigConc_stdev = np.std(avgSigsRun)
-                avgSigConc_relstdev = (avgSigConc_stdev/avgSigConc)*100
-  
-                concentration.append(conc1)
-                signal.append(avgSigConc)    
-                stddev.append(avgSigConc_stdev)
-                relstddev.append(avgSigConc_relstdev)
-                
                 if float(conc1.partition(" ")[0]) < windowCalcConc:
                         Rvalue.append(None)
                         Rstddev.append(None)
@@ -238,7 +247,8 @@ def dataanalysis(fileName):
                 plt.clf()
        
         # Graphing separagrams for the first run for every concentration
-        for x in range(1,int(numberOfConcs),2):         
+        lastConc = 0
+        for x in range(1,int(numberOfConcs)):         
             conc1 = idealSheet.cell(x,5).value
 
             # Reading in the whole data frame (= all runs for one particular concentration) and dropping all lines that are blank, i.e. that would produce "NaN"s
@@ -252,15 +262,20 @@ def dataanalysis(fileName):
             xvalues = xvalues[xvalues >= injectionTime]
             xvalues = xvalues.subtract(injectionTime)
 
-            p = plt.plot(xvalues, yvalues, label= '%s' % conc1)   
+            if peakDet == "M":
+                peakTime = manualPeaks[x-1]
+                
+            if float(conc1.partition(" ")[0])== 0 or float(conc1.partition(" ")[0]) == windowCalcConc or abs(float(yvalues[xvalues==peakTime])-lastConc)>=0.2*maxSig: 
+                p = plt.plot(xvalues, yvalues, label= '%s' % conc1)
+                lastConc = float(yvalues[xvalues==peakTime])
 
-        plt.xlabel('Propagation time (s)', fontweight='bold', fontsize=10)
+        plt.xlabel('Propagation time (s)', fontweight='bold', fontsize=13)
         if dataType == "MS":
-                plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=10)
+                plt.ylabel('MS intensity (a.u.)', fontweight='bold', fontsize=13)
         elif dataType == "F":
-                plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=10)
-        plt.text(minTime, maxSig*1.05, r"[%s]$\mathbf{_0}$"  % (proteinName), fontweight='bold', fontsize=10)
-        plt.legend(fontsize=10)
+                plt.ylabel('Fluorescence (a.u.)', fontweight='bold', fontsize=13)
+        plt.text(minTime, maxSig*1.05, r"[%s]$\mathbf{_0}$"  % (proteinName), fontweight='bold', fontsize=13)
+        plt.legend(fontsize=13)
         if peakDet == "P":
                 plt.vlines(windowLow, 0, maxSig*1.05, linestyles='dashed',color='gray')
                 plt.vlines(windowHigh, 0, maxSig*1.05, linestyles='dashed',color='gray')
@@ -273,7 +288,8 @@ def dataanalysis(fileName):
         plt.clf()
 
 
-        ## Part 5 - Calculate R values and standard deviation of R values for each concentration 
+        ## Part 5 - Calculate R values and standard deviation of R values for each concentration
+        
         LowProt_sig = signal[len(Rvalue)]
         HighProt_sig = signal[len(concentration)-1]
         LowProt_stddev = stddev[len(Rvalue)]
@@ -301,6 +317,7 @@ def dataanalysis(fileName):
                 if float(num) >= windowCalcConc:
                         concs.append(float(num))
         unit = concentration[0].partition(" ")[2]
+        
 
         Rvalue_drop = [i for i in Rvalue if i is not None]
         Rstddev_drop = [i for i in Rstddev if i is not None]
@@ -324,11 +341,11 @@ def dataanalysis(fileName):
 
         xFit = np.arange(0.0, max(concs), concs[step])
         plt.plot(xFit, LevenMarqu(xFit, popt), linewidth=1.5, color='black', label="Best Fit")
-        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.3g ± %.3g %s' % (popt, error, unit), fontweight='bold', fontsize=10)
-        plt.ylabel('R', fontweight='bold', fontsize=10)
-        plt.xlabel(r'[%s]$\mathbf{_0}$ (%s)' % (proteinName,unit), fontweight='bold',fontsize=10)
+        plt.text((concs[step]), 0.2, r'K$\mathbf{_d}$ = %.3g ± %.3g %s' % (popt, error, unit), fontweight='bold', fontsize=13)
+        plt.ylabel('R', fontweight='bold', fontsize=13)
+        plt.xlabel(r'[%s]$\mathbf{_0}$ (%s)' % (proteinName,unit), fontweight='bold',fontsize=13)
         plt.xscale("log")
-        plt.legend(fontsize=10)
+        plt.legend(fontsize=13)
         plt.savefig("%s/bindingisotherm.png" % subdirect)           # save binding isotherm graph
         graphs.append(plt.figure())
         plt.close()
