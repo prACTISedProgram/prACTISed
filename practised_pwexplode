@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Note: this code is included in prACTISed for decompressing Karat 32 data files.
+# This code is from Sven Kochmann's 2019 PWExplode with a small modification to allow
+# for use withPython3. Original code written for Python2
+
 # pwexplode.py - implementation of the PKWARE Data Compression Library 
 # format (imploding) for byte streams
 # Copyright (C) 2019 by Sven Kochmann
@@ -421,7 +425,9 @@ def explode(compressedstring):
                 debug_print("Found non-coded literal '%s' by reading in 8 bits" % pchar)
 
             # Add to output data
-            decompresseddata += pchar.encode("UTF-8")
+            # decompresseddata += pchar.encode("UTF-8")
+            decompresseddata += struct.pack('B', ord(pchar))
+            
 
         # Copy instructions!
         elif bit == '1':
