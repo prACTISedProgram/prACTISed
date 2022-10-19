@@ -248,7 +248,7 @@ def dataanalysis(fileName):
        
         # Graphing separagrams for the first run for every concentration
         lastConc = 0
-        for x in range(1,int(numberOfConcs)):         
+        for x in range(1,int(numberOfConcs)+1):         
             conc1 = idealSheet.cell(x,5).value
 
             # Reading in the whole data frame (= all runs for one particular concentration) and dropping all lines that are blank, i.e. that would produce "NaN"s
@@ -264,10 +264,12 @@ def dataanalysis(fileName):
 
             if peakDet == "M":
                 peakTime = manualPeaks[x-1]
+
+            checkConc = float(conc1.partition(" ")[0])
                 
-            if float(conc1.partition(" ")[0])== 0 or float(conc1.partition(" ")[0]) == windowCalcConc or abs(float(yvalues[xvalues==peakTime])-lastConc)>=0.2*maxSig: 
+            if checkConc == 0 or checkConc == windowCalcConc or x == numberOfConcs or any(abs(yvalues[xvalues==peakTime]-lastConc)>=0.2*maxSig):
                 p = plt.plot(xvalues, yvalues, label= '%s' % conc1)
-                lastConc = float(yvalues[xvalues==peakTime])
+                lastConc = yvalues[xvalues==peakTime]
 
         plt.xlabel('Propagation time (s)', fontweight='bold', fontsize=13)
         if dataType == "MS":
